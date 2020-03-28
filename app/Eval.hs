@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Eval where
+module Eval (eval, run, RuntimeError(..)) where
 
 import           Term (Term)
 import qualified Term

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 91a168c9dca6cd28d7ff718a43f8dc82ab91390bee6b2f69c5a3a82fa0b07204
+-- hash: 257871eaac5f84b2027d3b70d5daeeaa1b2c2e7a0af290ed654048e478c60574
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -46,6 +46,7 @@ executable typed-lambda-exe
       Parse
       Term
       Type
+      TypeCheck
       Value
       Paths_typed_lambda
   hs-source-dirs:

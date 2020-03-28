@@ -3,6 +3,9 @@ module Main where
 
 import qualified Term
 import           Parse (parse)
+import qualified Type
+import           TypeCheck (typeCheck)
+import qualified TypeCheck
 import qualified Eval
 import qualified System.IO as IO  
 import qualified System.Exit as Exit
@@ -15,7 +18,7 @@ main = do
 
     ast <- case parse source of
         Left errorMessage -> do
-            IO.hPutStrLn IO.stderr "ERROR: failed to parse the given source code."
+            IO.hPutStrLn IO.stderr "SyntaxError: failed to parse the given source code."
             IO.hPutStrLn IO.stderr errorMessage
             Exit.exitFailure
         Right result ->
@@ -23,9 +26,16 @@ main = do
 
     TIO.putStrLn $ "AST:\n" <> Term.pretty 1 ast
 
+    case typeCheck ast of
+        Left (TypeCheck.TypeError errorMessage) -> do
+            TIO.hPutStrLn IO.stderr $ "TypeError: " <> errorMessage
+            Exit.exitFailure
+        Right result ->
+            TIO.putStrLn $ "Type: " <> Type.pretty result
+
     value <- case Eval.run ast of
         Left (Eval.RuntimeError errorMessage) -> do
-            TIO.hPutStrLn IO.stderr $ "ERROR: " <> errorMessage
+            TIO.hPutStrLn IO.stderr $ "RuntimeError: " <> errorMessage
             Exit.exitFailure
         Right result ->
             return result
