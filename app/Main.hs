@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import qualified Term
 import           Parse (parse)
 import qualified Eval
 import qualified System.IO as IO  
@@ -20,7 +21,7 @@ main = do
         Right result ->
             return result
 
-    putStrLn $ "AST: " ++ show ast
+    TIO.putStrLn $ "AST:\n" <> Term.pretty 1 ast
 
     value <- case Eval.run ast of
         Left (Eval.RuntimeError errorMessage) -> do
