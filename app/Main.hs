@@ -2,6 +2,7 @@
 module Main where
 
 import           Parse (parse)
+import qualified Eval
 import qualified System.IO as IO  
 import qualified System.Exit as Exit
 import qualified Data.Text.IO as TIO
@@ -9,12 +10,23 @@ import qualified Data.Text.IO as TIO
 main :: IO ()
 main = do
     source <- TIO.getContents
-    TIO.hPutStrLn IO.stderr $ "Source: " <> source
+    TIO.hPutStr IO.stderr $ "Source:\n----------\n" <> source <> "\n----------\n"
 
-    case parse source of
+    ast <- case parse source of
         Left errorMessage -> do
-            putStrLn "ERROR: failed to parse the given source code."
-            putStrLn errorMessage
+            IO.hPutStrLn IO.stderr "ERROR: failed to parse the given source code."
+            IO.hPutStrLn IO.stderr errorMessage
             Exit.exitFailure
         Right result ->
-            print result
+            return result
+
+    putStrLn $ "AST: " ++ show ast
+
+    value <- case Eval.run ast of
+        Left (Eval.RuntimeError errorMessage) -> do
+            TIO.hPutStrLn IO.stderr $ "ERROR: " <> errorMessage
+            Exit.exitFailure
+        Right result ->
+            return result
+
+    putStrLn $ "=> " ++ show value

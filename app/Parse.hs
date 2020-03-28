@@ -97,12 +97,20 @@ variable :: Parser Term
 variable =
     Term.Variable <$> identifier
 
+parens :: Parser Term
+parens =
+    Parsec.between
+        (symbol "(")
+        (symbol ")")
+        term
+
 term_ :: Parser Term
 term_ =
     Parsec.choice
         [ boolLiteral
         , lambdaExpr
         , variable
+        , parens
         ]
     <?> "term"
 
