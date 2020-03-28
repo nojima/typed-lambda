@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parse(parse) where
+module Parse (parse) where
 
 import           Term (Term)
 import qualified Term
@@ -67,15 +67,10 @@ boolType =
 
 type_ :: Parser Type
 type_ =
-    (\arg1 maybeArg2 -> case maybeArg2 of
-        Just arg2 -> Type.Function arg1 arg2
-        Nothing   -> arg1
-    )
-    <$> boolType
-    <*> Parsec.optional
-        (  symbol "->"
-        *> type_
-        )
+    let
+        types = boolType `Parsec.sepBy` symbol "->"
+    in
+    foldr1 Type.Function <$> types
 
 boolLiteral :: Parser Term
 boolLiteral =

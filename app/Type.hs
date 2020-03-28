@@ -13,5 +13,6 @@ pretty type_ =
     case type_ of
         Bool ->
             "Bool"
+
         Function arg ret ->
             pretty arg <> " -> " <> pretty ret

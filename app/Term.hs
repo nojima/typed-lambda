@@ -20,10 +20,12 @@ pretty indentLevel term =
     case term of
         Bool bool ->
             T.pack (show bool)
+
         Variable identifier ->
             Identifier.name identifier
+
         Lambda argumentName argumentType body ->
-            "(lambda "
+            "(LAMBDA "
             <> Identifier.name argumentName
             <> " : "
             <> Type.pretty argumentType
@@ -31,8 +33,9 @@ pretty indentLevel term =
             <> indent indentLevel
             <> pretty (indentLevel + 1) body
             <> ")"
+
         Apply function argument ->
-            "(apply \n"
+            "(APPLY \n"
             <> indent indentLevel
             <> pretty (indentLevel + 1) function
             <> "\n"
@@ -42,4 +45,4 @@ pretty indentLevel term =
 
 indent :: Int -> Text
 indent level =
-    T.replicate level "    "
+    T.replicate level "|   "

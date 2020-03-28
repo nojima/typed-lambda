@@ -11,7 +11,7 @@ import qualified Data.Text.IO as TIO
 main :: IO ()
 main = do
     source <- TIO.getContents
-    TIO.hPutStr IO.stderr $ "Source:\n----------\n" <> source <> "\n----------\n"
+    TIO.hPutStr IO.stderr $ "----------\nSource:\n" <> source <> "\n----------\n"
 
     ast <- case parse source of
         Left errorMessage -> do
