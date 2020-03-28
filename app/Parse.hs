@@ -123,10 +123,14 @@ term =
     <$> term_
     <*> Parsec.optional term
 
+program :: Parser Term
+program =
+    space *> term <* Parsec.eof
+
 --------------------------------------------------------------------------------
 
 parse :: Text -> Either String Term
 parse source =
-    case Parsec.parse term "" source of
+    case Parsec.parse program "" source of
         Left errors  -> Left (Parsec.errorBundlePretty errors)
         Right result -> Right result
