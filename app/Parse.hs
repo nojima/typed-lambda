@@ -5,7 +5,7 @@ import           Term(Term)
 import qualified Term
 import           Data.Text(Text)
 import qualified Data.Text as T
-import           Text.Megaparsec(Parsec)
+import           Text.Megaparsec(Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
@@ -89,6 +89,7 @@ term =
         , predExpr
         , isZeroExpr
         ]
+    <?> "term"
 
 --------------------------------------------------------------------------------
 
