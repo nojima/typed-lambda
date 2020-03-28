@@ -1,6 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Lib
+import           Parse(parse)
+import qualified System.IO as IO  
+import qualified Data.Text.IO as TIO
 
 main :: IO ()
-main = someFunc
+main = do
+    source <- TIO.getContents
+    TIO.hPutStrLn IO.stderr $ "Source: " <> source
+    print $ parse source
