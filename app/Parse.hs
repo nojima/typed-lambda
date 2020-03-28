@@ -68,7 +68,7 @@ boolType =
 type_ :: Parser Type
 type_ =
     let
-        types = boolType `Parsec.sepBy` symbol "->"
+        types = boolType `Parsec.sepBy1` symbol "->"
     in
     foldr1 Type.Function <$> types
 
