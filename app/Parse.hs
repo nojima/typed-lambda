@@ -14,6 +14,7 @@ import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 import           Data.Void (Void)
+import           Data.List (foldl1')
 
 type Parser a = Parsec Void Text a
 
@@ -116,12 +117,10 @@ term_ =
 
 term :: Parser Term
 term =
-    (\term1 maybeTerm2 -> case maybeTerm2 of
-        Just term2 -> Term.Apply term1 term2
-        Nothing    -> term1
-    )
-    <$> term_
-    <*> Parsec.optional term
+    let
+        successiveTerms = Parsec.some term_
+    in
+    foldl1' Term.Apply <$> successiveTerms
 
 program :: Parser Term
 program =
