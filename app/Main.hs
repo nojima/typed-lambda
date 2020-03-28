@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Parse(parse)
+import           Parse (parse)
 import qualified System.IO as IO  
 import qualified System.Exit as Exit
 import qualified Data.Text.IO as TIO

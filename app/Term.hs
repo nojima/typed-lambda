@@ -1,11 +1,11 @@
-module Term where
+module Term (Term(..)) where
+
+import Identifier (Identifier)
+import Type (Type)
 
 data Term
-    = True
-    | False
-    | If Term Term Term
-    | Zero
-    | Succ Term
-    | Pred Term
-    | IsZero Term
+    = Bool Bool
+    | Variable Identifier
+    | Lambda Identifier Type Term
+    | Apply Term Term
     deriving (Show, Eq)

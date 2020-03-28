@@ -1,15 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Parse(parse) where
 
-import           Term(Term)
+import           Term (Term)
 import qualified Term
-import           Data.Text(Text)
+import           Identifier (Identifier(..))
+import           Type (Type)
+import qualified Type
+import qualified Data.Char as Char
+import           Data.Text (Text)
 import qualified Data.Text as T
-import           Text.Megaparsec(Parsec, (<?>))
+import           Text.Megaparsec (Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
-import           Data.Void(Void)
+import           Data.Void (Void)
 
 type Parser a = Parsec Void Text a
 
@@ -38,58 +42,78 @@ keyword str =
 
 --------------------------------------------------------------------------------
 
-trueLiteral :: Parser Term
-trueLiteral =
-    Term.True <$ keyword "true"
+identifier :: Parser Identifier
+identifier =
+    let
+        alphaChar =
+            Parsec.satisfy
+                (\c -> Char.isAlpha c && Char.isAscii c)
+                <?> "alphabet"
 
-falseLiteral :: Parser Term
-falseLiteral =
-    Term.False <$ keyword "false"
+        alphaNumChars =
+            Parsec.takeWhileP
+                (Just "alphabets or numbers")
+                (\c -> (Char.isAlpha c || Char.isNumber c) && Char.isAscii c)
 
-zeroLiteral :: Parser Term
-zeroLiteral =
-    Term.Zero <$ keyword "0" 
+        parser =
+            lexeme (T.cons <$> alphaChar <*> alphaNumChars)
+    in
+    Identifier <$> parser <?> "identifier"
 
-ifExpr :: Parser Term
-ifExpr =
-    Term.If
-        <$  keyword "if"
-        <*> term
-        <*  keyword "then"
-        <*> term
-        <*  keyword "else"
+boolType :: Parser Type
+boolType =
+    Type.Bool <$ keyword "Bool"
+
+type_ :: Parser Type
+type_ =
+    (\arg1 maybeArg2 -> case maybeArg2 of
+        Just arg2 -> Type.Function arg1 arg2
+        Nothing   -> arg1
+    )
+    <$> boolType
+    <*> Parsec.optional
+        (  symbol "->"
+        *> type_
+        )
+
+boolLiteral :: Parser Term
+boolLiteral =
+    Parsec.choice
+        [ Term.Bool True  <$ keyword "true"
+        , Term.Bool False <$ keyword "false"
+        ]
+
+lambdaExpr :: Parser Term
+lambdaExpr =
+    Term.Lambda
+        <$  keyword "lambda"
+        <*> identifier
+        <*  symbol ":"
+        <*> type_
+        <*  symbol "."
         <*> term
 
-succExpr :: Parser Term
-succExpr =
-    Term.Succ
-        <$  keyword "succ"
-        <*> term
+variable :: Parser Term
+variable =
+    Term.Variable <$> identifier
 
-predExpr :: Parser Term
-predExpr =
-    Term.Pred
-        <$  keyword "pred"
-        <*> term
-
-isZeroExpr :: Parser Term
-isZeroExpr =
-    Term.IsZero
-        <$  keyword "iszero"
-        <*> term
+term_ :: Parser Term
+term_ =
+    Parsec.choice
+        [ boolLiteral
+        , lambdaExpr
+        , variable
+        ]
+    <?> "term"
 
 term :: Parser Term
 term =
-    Parsec.choice
-        [ trueLiteral
-        , falseLiteral
-        , zeroLiteral
-        , ifExpr
-        , succExpr
-        , predExpr
-        , isZeroExpr
-        ]
-    <?> "term"
+    (\term1 maybeTerm2 -> case maybeTerm2 of
+        Just term2 -> Term.Apply term1 term2
+        Nothing    -> term1
+    )
+    <$> term_
+    <*> Parsec.optional term
 
 --------------------------------------------------------------------------------
 
