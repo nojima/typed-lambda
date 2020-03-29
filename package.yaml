@@ -24,6 +24,8 @@ dependencies:
 - text
 - megaparsec
 - containers
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src
@@ -48,5 +50,6 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
     dependencies:
     - typed-lambda
