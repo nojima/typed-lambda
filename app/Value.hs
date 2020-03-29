@@ -5,6 +5,7 @@ import Identifier (Identifier)
 
 data Value
     = Bool Bool
+    | Nat Integer
     | Closure Frame Identifier Term
     deriving (Show, Eq)
 

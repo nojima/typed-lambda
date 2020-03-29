@@ -32,6 +32,27 @@ evalVariable frame identifier =
             in
             Left (RuntimeError errorMessage)
 
+evalIf :: Frame -> Term -> Term -> Term -> Either RuntimeError Value
+evalIf frame condTerm thenTerm elseTerm = do
+    condValue <- eval frame condTerm
+    cond <- case condValue of
+        Value.Bool bool ->
+            return bool
+
+        value ->
+            let
+                errorMessage =
+                    "non-bool '"
+                    <> T.pack (show value)
+                    <> "' used as if condition"
+            in
+            Left $ RuntimeError errorMessage
+
+    if cond then
+        eval frame thenTerm
+    else
+        eval frame elseTerm
+
 evalApply :: Frame -> Term -> Term -> Either RuntimeError Value
 evalApply frame function argument = do
     functionValue <- eval frame function
@@ -58,6 +79,12 @@ eval frame term =
     case term of
         Term.Bool value ->
             Right $ Value.Bool value
+
+        Term.Nat value ->
+            Right $ Value.Nat value
+
+        Term.If condTerm thenTerm elseTerm ->
+            evalIf frame condTerm thenTerm elseTerm
 
         Term.Variable identifier ->
             evalVariable frame identifier

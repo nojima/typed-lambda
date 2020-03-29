@@ -13,8 +13,12 @@ import           Text.Megaparsec (Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
+import qualified Text.Megaparsec.Error as Error
 import           Data.Void (Void)
 import           Data.List (foldl1')
+import qualified Data.List.NonEmpty as NonEmpty
+import           Data.Set (Set)
+import qualified Data.Set as Set
 
 type Parser a = Parsec Void Text a
 
@@ -35,16 +39,28 @@ symbol :: Text -> Parser Text
 symbol =
     Lexer.symbol space
 
+decimal :: Parser Integer
+decimal =
+    lexeme Lexer.decimal
+
+keywords :: Set Text
+keywords = Set.fromList
+    [ "if"
+    , "then"
+    , "else"
+    , "true"
+    , "false"
+    , "lambda"
+    ]
+
 keyword :: Text -> Parser ()
 keyword str =
     lexeme $
         () <$ Char.string str
            <* Parsec.notFollowedBy Char.alphaNumChar
 
---------------------------------------------------------------------------------
-
-identifier :: Parser Identifier
-identifier =
+identifierOrKeyword :: Parser Text
+identifierOrKeyword =
     let
         alphaChar =
             Parsec.satisfy
@@ -55,20 +71,46 @@ identifier =
             Parsec.takeWhileP
                 (Just "alphabets or numbers")
                 (\c -> (Char.isAlpha c || Char.isNumber c) && Char.isAscii c)
-
-        parser =
-            lexeme (T.cons <$> alphaChar <*> alphaNumChars)
     in
-    Identifier <$> parser <?> "identifier"
+    lexeme (T.cons <$> alphaChar <*> alphaNumChars)
+
+identifier :: Parser Identifier
+identifier =
+    Parsec.try (do
+        word <- identifierOrKeyword
+        if Set.member word keywords then
+            let
+                actual = Error.Tokens (NonEmpty.fromList (T.unpack word))
+                expected = Error.Label (NonEmpty.fromList "identifier")
+            in
+            Parsec.failure
+                (Just actual)
+                (Set.singleton expected)
+        else
+            return $ Identifier word
+    ) <?> "identifier"
+
+--------------------------------------------------------------------------------
 
 boolType :: Parser Type
 boolType =
     Type.Bool <$ keyword "Bool"
 
+natType :: Parser Type
+natType =
+    Type.Nat <$ keyword "Nat"
+
+atomicType :: Parser Type
+atomicType =
+    Parsec.choice
+        [ boolType
+        , natType
+        ]
+
 type_ :: Parser Type
 type_ =
     let
-        types = boolType `Parsec.sepBy1` symbol "->"
+        types = atomicType `Parsec.sepBy1` symbol "->"
     in
     foldr1 Type.Function <$> types
 
@@ -79,6 +121,10 @@ boolLiteral =
         , Term.Bool False <$ keyword "false"
         ]
 
+natLiteral :: Parser Term
+natLiteral =
+    Term.Nat <$> decimal
+
 lambdaExpr :: Parser Term
 lambdaExpr =
     Term.Lambda
@@ -87,6 +133,16 @@ lambdaExpr =
         <*  symbol ":"
         <*> type_
         <*  symbol "."
+        <*> term
+
+ifExpr :: Parser Term
+ifExpr =
+    Term.If
+        <$  keyword "if"
+        <*> term
+        <*  keyword "then"
+        <*> term
+        <*  keyword "else"
         <*> term
 
 variable :: Parser Term
@@ -104,7 +160,9 @@ term_ :: Parser Term
 term_ =
     Parsec.choice
         [ boolLiteral
+        , natLiteral
         , lambdaExpr
+        , ifExpr
         , variable
         , parens
         ]

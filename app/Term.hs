@@ -10,6 +10,8 @@ import qualified Data.Text as T
 
 data Term
     = Bool Bool
+    | Nat Integer
+    | If Term Term Term
     | Variable Identifier
     | Lambda Identifier Type Term
     | Apply Term Term
@@ -20,6 +22,20 @@ pretty indentLevel term =
     case term of
         Bool bool ->
             T.pack (show bool)
+
+        Nat nat ->
+            T.pack (show nat)
+
+        If condTerm thenTerm elseTerm ->
+            "(IF ("
+            <> pretty (indentLevel + 1) condTerm
+            <> ")\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) thenTerm
+            <> "\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) elseTerm
+            <> ")"
 
         Variable identifier ->
             Identifier.name identifier

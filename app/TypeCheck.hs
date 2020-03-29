@@ -38,6 +38,37 @@ typeOfVariable context identifier =
         Just type_ ->
             Right type_
 
+typeOfIf :: Context -> Term -> Term -> Term -> Either TypeError Type
+typeOfIf context condTerm thenTerm elseTerm = do
+    condType <- typeOf context condTerm
+    thenType <- typeOf context thenTerm
+    elseType <- typeOf context elseTerm
+
+    if condType /= Type.Bool then
+        let
+            errorMessage =
+                "non-bool '"
+                <> Type.pretty condType
+                <> "' used as `if` condition"
+        in
+        Left $ TypeError errorMessage
+
+    else if thenType /= elseType then
+        let
+            errorMessage =
+                "`then` and `else` have incompatible types.\n"
+                <> "  then: "
+                <> Type.pretty thenType
+                <> "\n"
+                <> "  else: "
+                <> Type.pretty elseType
+                <> "\n"
+        in
+        Left $ TypeError errorMessage
+    
+    else
+        Right thenType
+
 typeOfLambda :: Context -> Identifier -> Type -> Term -> Either TypeError Type
 typeOfLambda context argumentName argumentType body =
     let
@@ -81,6 +112,12 @@ typeOf context term =
     case term of
         Term.Bool _ ->
             Right Type.Bool
+
+        Term.Nat _ ->
+            Right Type.Nat
+
+        Term.If condTerm thenTerm elseTerm ->
+            typeOfIf context condTerm thenTerm elseTerm
 
         Term.Variable identifier ->
             typeOfVariable context identifier
