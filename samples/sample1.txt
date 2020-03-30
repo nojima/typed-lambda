@@ -1,1 +1,1 @@
-if iszero succ pred 0 then true else false
+if true then 10 else 20
