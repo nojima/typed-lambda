@@ -116,19 +116,24 @@ type_ =
 
 boolLiteral :: Parser Term
 boolLiteral =
-    Parsec.choice
-        [ Term.Bool True  <$ keyword "true"
-        , Term.Bool False <$ keyword "false"
-        ]
+    Term.Bool
+        <$> Parsec.getSourcePos
+        <*> Parsec.choice
+            [ True  <$ keyword "true"
+            , False <$ keyword "false"
+            ]
 
 natLiteral :: Parser Term
 natLiteral =
-    Term.Nat <$> decimal
+    Term.Nat
+        <$> Parsec.getSourcePos
+        <*> decimal
 
 lambdaExpr :: Parser Term
 lambdaExpr =
     Term.Lambda
-        <$  keyword "lambda"
+        <$> Parsec.getSourcePos
+        <*  keyword "lambda"
         <*> identifier
         <*  symbol ":"
         <*> type_
@@ -138,7 +143,8 @@ lambdaExpr =
 ifExpr :: Parser Term
 ifExpr =
     Term.If
-        <$  keyword "if"
+        <$> Parsec.getSourcePos
+        <*  keyword "if"
         <*> term
         <*  keyword "then"
         <*> term
@@ -147,7 +153,9 @@ ifExpr =
 
 variable :: Parser Term
 variable =
-    Term.Variable <$> identifier
+    Term.Variable
+        <$> Parsec.getSourcePos
+        <*> identifier
 
 parens :: Parser Term
 parens =
@@ -173,7 +181,9 @@ term =
     let
         successiveTerms = Parsec.some term_
     in
-    foldl1' Term.Apply <$> successiveTerms
+    foldl1'
+        (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
+        <$> successiveTerms
 
 program :: Parser Term
 program =

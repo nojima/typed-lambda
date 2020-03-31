@@ -5,75 +5,86 @@ import           Parse
 import           Term (Term)
 import qualified Term
 import qualified Type
+import qualified Text.Megaparsec.Pos as ParsecPos
 import           Test.Hspec
 import qualified Data.Either as Either
+
+-- dummy source pos
+x :: Term.SourcePos
+x = ParsecPos.initialPos ""
 
 spec :: Spec
 spec =
     describe "parse" $ do
         context "bool literal" $ do
             it "can parse `true`" $
-                parse "true" `shouldBe` Right (Term.Bool True)
+                parse "true" `shouldSuccess` Term.Bool x True
 
             it "can parse `false`" $
-                parse "false" `shouldBe` Right (Term.Bool False)
+                parse "false" `shouldSuccess` Term.Bool x False
 
             it "can parse `true` with trailing space" $
-                parse "true  " `shouldBe` Right (Term.Bool True)
+                parse "true  " `shouldSuccess` Term.Bool x True
 
             it "can parse `false` with trailing space" $
-                parse "false \n" `shouldBe` Right (Term.Bool False)
+                parse "false \n" `shouldSuccess` Term.Bool x False
 
         context "nat literal" $ do
             it "can parse `0`" $
-                parse "0" `shouldBe` Right (Term.Nat 0)
+                parse "0" `shouldSuccess` Term.Nat x 0
 
             it "can parse `10`" $
-                parse "10" `shouldBe` Right (Term.Nat 10)
+                parse "10" `shouldSuccess` Term.Nat x 10
 
             it "can parse `0` with trailing space" $
-                parse "0 " `shouldBe` Right (Term.Nat 0)
+                parse "0 " `shouldSuccess` Term.Nat x 0
 
             it "cannot parse `-1`" $
                 shouldBeError (parse "-1")
 
         context "lambda expression" $ do
             it "can pares lambda expression" $
-                parse "lambda x : Bool . foo" `shouldBe`
-                    Right (Term.Lambda "x" Type.Bool (Term.Variable "foo"))
+                parse "lambda hoge : Bool . foo" `shouldSuccess`
+                    Term.Lambda x "hoge" Type.Bool (Term.Variable x "foo")
 
             it "can apply lambda" $
-                parse "(lambda x : Bool . x) 10" `shouldBe`
-                    Right (Term.Apply
-                        (Term.Lambda "x" Type.Bool (Term.Variable "x"))
-                        (Term.Nat 10)
-                    )
+                parse "(lambda hoge : Bool . hoge) 10" `shouldSuccess`
+                    Term.Apply x
+                        (Term.Lambda x "hoge" Type.Bool (Term.Variable x "hoge"))
+                        (Term.Nat x 10)
 
             it "can apply multiple argument" $
-                parse "(lambda x : Bool . lambda y : Nat . y) true 10" `shouldBe`
-                    Right (Term.Apply
-                        (Term.Apply
-                            (Term.Lambda "x" Type.Bool
-                                (Term.Lambda "y" Type.Nat
-                                    (Term.Variable "y")
+                parse "(lambda hoge : Bool . lambda fuga : Nat . fuga) true 10" `shouldSuccess`
+                    Term.Apply x
+                        (Term.Apply x
+                            (Term.Lambda x "hoge" Type.Bool
+                                (Term.Lambda x "fuga" Type.Nat
+                                    (Term.Variable x "fuga")
                                 )
                             )
-                            (Term.Bool True)
+                            (Term.Bool x True)
                         )
-                        (Term.Nat 10)
-                    )
+                        (Term.Nat x 10)
 
         context "if expression" $
             it "can parse if expression" $
-                parse "if true then 1 else 2" `shouldBe`
-                    Right (Term.If (Term.Bool True) (Term.Nat 1) (Term.Nat 2))
+                parse "if true then 1 else 2" `shouldSuccess`
+                    Term.If x (Term.Bool x True) (Term.Nat x 1) (Term.Nat x 2)
 
         context "variable" $ do
             it "can parse variable" $
-                parse "x" `shouldBe` Right (Term.Variable "x")
+                parse "v" `shouldSuccess` Term.Variable x "v"
 
             it "distinguishes keyword from variables" $
                 shouldBeError (parse "then")
+
+shouldSuccess :: Either String Term -> Term -> Expectation
+shouldSuccess actual expected =
+    case actual of
+        Right term ->
+            (Term.mapSourcePos (const x) term) `shouldBe` expected
+        Left _ ->
+            actual `shouldBe` (Right expected)
 
 shouldBeError :: Either String Term -> Expectation
 shouldBeError result =

@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TypeCheck (typeCheck, TypeError(..)) where
 
-import           Term (Term)
+import           Term (Term, SourcePos)
 import qualified Term
 import           Type (Type)
 import qualified Type
 import           Identifier (Identifier)
 import qualified Identifier
 import           Data.Text (Text)
+import qualified Data.Text as T
 
 newtype TypeError = TypeError Text
 
@@ -23,13 +24,14 @@ lookupVariable identifier context =
         then Just $ variableType context
         else lookupVariable identifier =<< parentContext context
 
-typeOfVariable :: Context -> Identifier -> Either TypeError Type
-typeOfVariable context identifier =
+typeOfVariable :: Context -> SourcePos -> Identifier -> Either TypeError Type
+typeOfVariable context pos identifier =
     case lookupVariable identifier context of
         Nothing ->
             let
                 errorMessage =
-                    "undefined variable '"
+                    (T.pack $ Term.sourcePosPretty pos)
+                    <> ": undefined variable '"
                     <> Identifier.name identifier
                     <> "'"
             in
@@ -65,7 +67,7 @@ typeOfIf context condTerm thenTerm elseTerm = do
                 <> "\n"
         in
         Left $ TypeError errorMessage
-    
+
     else
         Right thenType
 
@@ -110,22 +112,22 @@ typeOfApply context function argument = do
 typeOf :: Context -> Term -> Either TypeError Type
 typeOf context term =
     case term of
-        Term.Bool _ ->
+        Term.Bool _ _ ->
             Right Type.Bool
 
-        Term.Nat _ ->
+        Term.Nat _ _ ->
             Right Type.Nat
 
-        Term.If condTerm thenTerm elseTerm ->
+        Term.If pos condTerm thenTerm elseTerm ->
             typeOfIf context condTerm thenTerm elseTerm
 
-        Term.Variable identifier ->
-            typeOfVariable context identifier
+        Term.Variable pos identifier ->
+            typeOfVariable context pos identifier
 
-        Term.Lambda argumentName argumentType body ->
+        Term.Lambda pos argumentName argumentType body ->
             typeOfLambda context argumentName argumentType body
 
-        Term.Apply function argument ->
+        Term.Apply pos function argument ->
             typeOfApply context function argument
 
 typeCheck :: Term -> Either TypeError Type

@@ -77,22 +77,22 @@ evalApply frame function argument = do
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
-        Term.Bool value ->
+        Term.Bool _ value ->
             Right $ Value.Bool value
 
-        Term.Nat value ->
+        Term.Nat _ value ->
             Right $ Value.Nat value
 
-        Term.If condTerm thenTerm elseTerm ->
+        Term.If _ condTerm thenTerm elseTerm ->
             evalIf frame condTerm thenTerm elseTerm
 
-        Term.Variable identifier ->
+        Term.Variable _ identifier ->
             evalVariable frame identifier
 
-        Term.Lambda identifier _ body ->
+        Term.Lambda _ identifier _ body ->
             Right $ Value.Closure frame identifier body
 
-        Term.Apply function argument ->
+        Term.Apply _ function argument ->
             evalApply frame function argument
 
 run :: Term -> Either RuntimeError Value
