@@ -30,7 +30,7 @@ typeOfVariable context pos identifier =
         Nothing ->
             let
                 errorMessage =
-                    (T.pack $ Term.sourcePosPretty pos)
+                    T.pack (Term.sourcePosPretty pos)
                     <> ": undefined variable '"
                     <> Identifier.name identifier
                     <> "'"
@@ -40,8 +40,8 @@ typeOfVariable context pos identifier =
         Just type_ ->
             Right type_
 
-typeOfIf :: Context -> Term -> Term -> Term -> Either TypeError Type
-typeOfIf context condTerm thenTerm elseTerm = do
+typeOfIf :: Context -> SourcePos -> Term -> Term -> Term -> Either TypeError Type
+typeOfIf context pos condTerm thenTerm elseTerm = do
     condType <- typeOf context condTerm
     thenType <- typeOf context thenTerm
     elseType <- typeOf context elseTerm
@@ -49,7 +49,8 @@ typeOfIf context condTerm thenTerm elseTerm = do
     if condType /= Type.Bool then
         let
             errorMessage =
-                "non-bool '"
+                T.pack (Term.sourcePosPretty pos)
+                <> ": non-bool '"
                 <> Type.pretty condType
                 <> "' used as `if` condition"
         in
@@ -58,7 +59,8 @@ typeOfIf context condTerm thenTerm elseTerm = do
     else if thenType /= elseType then
         let
             errorMessage =
-                "`then` and `else` have incompatible types.\n"
+                T.pack (Term.sourcePosPretty pos)
+                <> ": `then` and `else` have incompatible types.\n"
                 <> "  then: "
                 <> Type.pretty thenType
                 <> "\n"
@@ -78,8 +80,8 @@ typeOfLambda context argumentName argumentType body =
     in
     Type.Function argumentType <$> typeOf newContext body
 
-typeOfApply :: Context -> Term -> Term -> Either TypeError Type
-typeOfApply context function argument = do
+typeOfApply :: Context -> SourcePos -> Term -> Term -> Either TypeError Type
+typeOfApply context pos function argument = do
     functionType <- typeOf context function
     argumentType <- typeOf context argument
 
@@ -90,7 +92,8 @@ typeOfApply context function argument = do
             else
                 let
                     errorMessage =
-                        "type mismatch:\n"
+                        T.pack (Term.sourcePosPretty pos)
+                        <> ": function argument has a incompatible type:\n"
                         <> "  expected: "
                         <> Type.pretty expectedArgumentType
                         <> "\n"
@@ -103,7 +106,8 @@ typeOfApply context function argument = do
         type_ ->
             let
                 errorMessage =
-                    "cannot apply non-function '"
+                    T.pack (Term.sourcePosPretty pos)
+                    <> ": cannot apply non-function '"
                     <> Type.pretty type_
                     <> "'"
             in
@@ -119,16 +123,16 @@ typeOf context term =
             Right Type.Nat
 
         Term.If pos condTerm thenTerm elseTerm ->
-            typeOfIf context condTerm thenTerm elseTerm
+            typeOfIf context pos condTerm thenTerm elseTerm
 
         Term.Variable pos identifier ->
             typeOfVariable context pos identifier
 
-        Term.Lambda pos argumentName argumentType body ->
+        Term.Lambda _ argumentName argumentType body ->
             typeOfLambda context argumentName argumentType body
 
         Term.Apply pos function argument ->
-            typeOfApply context function argument
+            typeOfApply context pos function argument
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =
