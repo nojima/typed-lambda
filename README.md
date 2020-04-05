@@ -53,7 +53,7 @@ lambda f:Int -> Int .
 項を並べれば関数適用になります。関数適用は左結合です。
 
 ```
-(lambda x:Int . x) 100
+(lambda x:Int . x * x) 100
 ```
 
 
@@ -63,6 +63,23 @@ lambda f:Int -> Int .
 
 ```
 if true then 10 else 20
+```
+
+### let式
+
+`let name = expr in ...` という構文で式を変数に束縛できます。
+
+```
+let x = 10 in x * x
+```
+
+ラムダを束縛すると名前付き関数の宣言として使えます。
+
+```
+let f = lambda x:Int .
+    x * x
+in
+f 100
 ```
 
 ### 二項演算子

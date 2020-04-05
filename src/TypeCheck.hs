@@ -197,6 +197,12 @@ typeOfBinOp context pos operator lhs rhs =
             else
                 return Type.Bool
 
+typeOfLet :: Context -> Identifier -> Term -> Term -> Either TypeError Type
+typeOfLet context name expr body = do
+    type_ <- typeOf context expr
+    let newContext = Context name type_ (Just context)
+    typeOf newContext body
+
 typeOf :: Context -> Term -> Either TypeError Type
 typeOf context term =
     case term of
@@ -220,6 +226,9 @@ typeOf context term =
 
         Term.BinOp pos operator lhs rhs ->
             typeOfBinOp context pos operator lhs rhs
+
+        Term.Let _ name expr body ->
+            typeOfLet context name expr body
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =

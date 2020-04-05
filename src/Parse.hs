@@ -53,6 +53,8 @@ keywords = Set.fromList
     , "true"
     , "false"
     , "lambda"
+    , "let"
+    , "in"
     ]
 
 keyword :: Text -> Parser ()
@@ -187,8 +189,8 @@ term =
         (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
         <$> successiveTerms
 
-expr :: Parser Term
-expr =
+expr_ :: Parser Term
+expr_ =
     Expr.makeExprParser
         term
         [ [ binaryOperator Expr.InfixL "*" Term.Mul
@@ -209,6 +211,24 @@ expr =
                     <$> Parsec.getSourcePos
                     <*> pure op
                     <*  symbol name
+
+letExpr :: Parser Term
+letExpr =
+    Term.Let
+        <$> Parsec.getSourcePos
+        <*  keyword "let"
+        <*> identifier
+        <*  symbol "="
+        <*> expr
+        <*  keyword "in"
+        <*> expr
+
+expr :: Parser Term
+expr =
+    Parsec.choice
+        [ letExpr
+        , expr_
+        ]
 
 program :: Parser Term
 program =

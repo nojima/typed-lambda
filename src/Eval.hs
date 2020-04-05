@@ -3,7 +3,8 @@ module Eval (eval, run, RuntimeError(..)) where
 
 import           Term (Term, Operator)
 import qualified Term
-import           Identifier (Identifier(..))
+import           Identifier (Identifier)
+import qualified Identifier
 import           Value (Value, Frame(..))
 import qualified Value
 import           Data.Text (Text)
@@ -116,6 +117,12 @@ evalBinOp frame operator lhs rhs = do
         Term.Or    -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
         Term.Equal -> return $ Value.Bool (lhsValue == rhsValue)
 
+evalLet :: Frame -> Identifier -> Term -> Term -> Either RuntimeError Value
+evalLet frame name expr body = do
+    value <- eval frame expr
+    let newFrame = Frame name value (Just frame)
+    eval newFrame body
+
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
@@ -140,9 +147,12 @@ eval frame term =
         Term.BinOp _ operator lhs rhs ->
             evalBinOp frame operator lhs rhs
 
+        Term.Let _ name expr body ->
+            evalLet frame name expr body
+
 run :: Term -> Either RuntimeError Value
 run term =
     let
-        topFrame = Frame (Identifier "") (Value.Bool False) Nothing
+        topFrame = Frame (Identifier.Identifier "") (Value.Bool False) Nothing
     in
     eval topFrame term

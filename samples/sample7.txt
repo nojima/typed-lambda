@@ -1,0 +1,4 @@
+let f = lambda x:Int .
+    2*x + 1
+in
+f 100

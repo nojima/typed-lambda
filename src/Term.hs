@@ -25,6 +25,7 @@ data Term
     | Lambda   SourcePos Identifier Type Term
     | Apply    SourcePos Term Term
     | BinOp    SourcePos Operator Term Term
+    | Let      SourcePos Identifier Term Term
     deriving (Show, Eq)
 
 data Operator
@@ -47,6 +48,7 @@ sourcePos term =
         Lambda sp _ _ _ -> sp
         Apply sp _ _ -> sp
         BinOp sp _ _ _ -> sp
+        Let sp _ _ _ -> sp
 
 mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
 mapSourcePos f term =
@@ -58,6 +60,7 @@ mapSourcePos f term =
         Lambda sp a t b -> Lambda (f sp) a t (mapSourcePos f b)
         Apply sp fn a -> Apply (f sp) (mapSourcePos f fn) (mapSourcePos f a)
         BinOp sp op t1 t2 -> BinOp (f sp) op (mapSourcePos f t1) (mapSourcePos f t2)
+        Let sp vn ve b -> Let (f sp) vn (mapSourcePos f ve) (mapSourcePos f b)
 
 pretty :: Int -> Term -> Text
 pretty indentLevel term =
@@ -109,6 +112,18 @@ pretty indentLevel term =
             <> " "
             <> pretty indentLevel rhs
             <> ")"
+
+        Let _ name expr body ->
+            "LET "
+            <> Identifier.name name
+            <> " =\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) expr
+            <> "\n"
+            <> indent indentLevel
+            <> "IN\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) body
 
 operatorPretty :: Operator -> Text
 operatorPretty operator =
