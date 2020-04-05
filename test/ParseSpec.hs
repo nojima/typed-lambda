@@ -31,13 +31,13 @@ spec =
 
         context "nat literal" $ do
             it "can parse `0`" $
-                parse "0" `shouldSuccess` Term.Nat x 0
+                parse "0" `shouldSuccess` Term.Int x 0
 
             it "can parse `10`" $
-                parse "10" `shouldSuccess` Term.Nat x 10
+                parse "10" `shouldSuccess` Term.Int x 10
 
             it "can parse `0` with trailing space" $
-                parse "0 " `shouldSuccess` Term.Nat x 0
+                parse "0 " `shouldSuccess` Term.Int x 0
 
             it "cannot parse `-1`" $
                 shouldBeError (parse "-1")
@@ -51,25 +51,25 @@ spec =
                 parse "(lambda hoge : Bool . hoge) 10" `shouldSuccess`
                     Term.Apply x
                         (Term.Lambda x "hoge" Type.Bool (Term.Variable x "hoge"))
-                        (Term.Nat x 10)
+                        (Term.Int x 10)
 
             it "can apply multiple argument" $
-                parse "(lambda hoge : Bool . lambda fuga : Nat . fuga) true 10" `shouldSuccess`
+                parse "(lambda hoge : Bool . lambda fuga : Int . fuga) true 10" `shouldSuccess`
                     Term.Apply x
                         (Term.Apply x
                             (Term.Lambda x "hoge" Type.Bool
-                                (Term.Lambda x "fuga" Type.Nat
+                                (Term.Lambda x "fuga" Type.Int
                                     (Term.Variable x "fuga")
                                 )
                             )
                             (Term.Bool x True)
                         )
-                        (Term.Nat x 10)
+                        (Term.Int x 10)
 
         context "if expression" $
             it "can parse if expression" $
                 parse "if true then 1 else 2" `shouldSuccess`
-                    Term.If x (Term.Bool x True) (Term.Nat x 1) (Term.Nat x 2)
+                    Term.If x (Term.Bool x True) (Term.Int x 1) (Term.Int x 2)
 
         context "variable" $ do
             it "can parse variable" $

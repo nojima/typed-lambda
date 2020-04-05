@@ -14,7 +14,7 @@ stack run < samples/sample1.txt
 この言語に存在する型は以下の３つのみです。
 
 ```
-Nat       -- 自然数
+Int       -- 整数
 Bool      -- Boolean
 T1 -> T2  -- T1からT2への関数
 ```
@@ -37,14 +37,14 @@ false
 
 ```
 -- identity function
-lambda x:Nat . x
+lambda x:Int . x
 ```
 
 引数を複数個取るような関数が欲しいときはラムダをネストさせてください。
 
 ```
-lambda f:Nat -> Nat .
-    lambda n:Nat .
+lambda f:Int -> Int .
+    lambda n:Int .
         f n
 ```
 
@@ -53,7 +53,7 @@ lambda f:Nat -> Nat .
 項を並べれば関数適用になります。関数適用は左結合です。
 
 ```
-(lambda x:Nat . x) 100
+(lambda x:Int . x) 100
 ```
 
 
@@ -69,10 +69,10 @@ if true then 10 else 20
 
 | シンボル | 意味 | 型 | 結合
 |---------|-----|----|-----
-| `+` | 足し算 | `Nat -> Nat -> Nat` | 左
-| `-` | 引き算 | `Nat -> Nat -> Nat` | 左
-| `*` | 掛け算 | `Nat -> Nat -> Nat` | 左
-| `/` | 割り算(小数点以下切り捨て) | `Nat -> Nat -> Nat` | 左
+| `+` | 足し算 | `Int -> Int -> Int` | 左
+| `-` | 引き算 | `Int -> Int -> Int` | 左
+| `*` | 掛け算 | `Int -> Int -> Int` | 左
+| `/` | 割り算(小数点以下切り捨て) | `Int -> Int -> Int` | 左
 | `&&` | 論理積 | `Bool -> Bool -> Bool` | 左
 | `||` | 論理和 | `Bool -> Bool -> Bool` | 左
 

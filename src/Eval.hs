@@ -74,15 +74,15 @@ evalApply frame function argument = do
             in
             Left $ RuntimeError errorMessage
 
-toNat :: Value -> Either RuntimeError Integer
-toNat value =
+toInt :: Value -> Either RuntimeError Integer
+toInt value =
     case value of
-        Value.Nat n ->
+        Value.Int n ->
             Right n
         other ->
             let
                 errorMessage =
-                    "a numeric value is expected, but "
+                    "an integer value is expected, but "
                     <> T.pack (show other)
                     <> " is passed"
             in
@@ -108,10 +108,10 @@ evalBinOp frame operator lhs rhs = do
     rhsValue <- eval frame rhs
 
     case operator of
-        Term.Add -> Value.Nat  <$> ((+)  <$> toNat  lhsValue <*> toNat  rhsValue)
-        Term.Sub -> Value.Nat  <$> ((-)  <$> toNat  lhsValue <*> toNat  rhsValue)
-        Term.Mul -> Value.Nat  <$> ((*)  <$> toNat  lhsValue <*> toNat  rhsValue)
-        Term.Div -> Value.Nat  <$> (div  <$> toNat  lhsValue <*> toNat  rhsValue)
+        Term.Add -> Value.Int  <$> ((+)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Sub -> Value.Int  <$> ((-)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Mul -> Value.Int  <$> ((*)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Div -> Value.Int  <$> (div  <$> toInt  lhsValue <*> toInt  rhsValue)
         Term.And -> Value.Bool <$> ((&&) <$> toBool lhsValue <*> toBool rhsValue)
         Term.Or  -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
 
@@ -121,8 +121,8 @@ eval frame term =
         Term.Bool _ value ->
             Right $ Value.Bool value
 
-        Term.Nat _ value ->
-            Right $ Value.Nat value
+        Term.Int _ value ->
+            Right $ Value.Int value
 
         Term.If _ condTerm thenTerm elseTerm ->
             evalIf frame condTerm thenTerm elseTerm

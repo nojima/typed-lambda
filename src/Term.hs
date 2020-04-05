@@ -19,7 +19,7 @@ import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 
 data Term
     = Bool     SourcePos Bool
-    | Nat      SourcePos Integer
+    | Int      SourcePos Integer
     | If       SourcePos Term Term Term
     | Variable SourcePos Identifier
     | Lambda   SourcePos Identifier Type Term
@@ -40,7 +40,7 @@ sourcePos :: Term -> SourcePos
 sourcePos term =
     case term of
         Bool sp _ -> sp
-        Nat sp _ -> sp
+        Int sp _ -> sp
         If sp _ _ _ -> sp
         Variable sp _ -> sp
         Lambda sp _ _ _ -> sp
@@ -51,7 +51,7 @@ mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
 mapSourcePos f term =
     case term of
         Bool sp bool -> Bool (f sp) bool
-        Nat sp nat -> Nat (f sp) nat
+        Int sp nat -> Int (f sp) nat
         If sp c t e -> If (f sp) (mapSourcePos f c) (mapSourcePos f t) (mapSourcePos f e)
         Variable sp i -> Variable (f sp) i
         Lambda sp a t b -> Lambda (f sp) a t (mapSourcePos f b)
@@ -64,7 +64,7 @@ pretty indentLevel term =
         Bool _ bool ->
             T.pack (show bool)
 
-        Nat _ nat ->
+        Int _ nat ->
             T.pack (show nat)
 
         If _ condTerm thenTerm elseTerm ->

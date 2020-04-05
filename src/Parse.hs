@@ -100,7 +100,7 @@ boolType =
 
 natType :: Parser Type
 natType =
-    Type.Nat <$ keyword "Nat"
+    Type.Int <$ keyword "Int"
 
 atomicType :: Parser Type
 atomicType =
@@ -127,7 +127,7 @@ boolLiteral =
 
 natLiteral :: Parser Term
 natLiteral =
-    Term.Nat
+    Term.Int
         <$> Parsec.getSourcePos
         <*> decimal
 

@@ -1,5 +1,5 @@
-(lambda x : Nat .
-    lambda y : Nat .
+(lambda x : Int .
+    lambda y : Int .
         lambda z : Bool .
             if z then x else y
 ) 42 33 false

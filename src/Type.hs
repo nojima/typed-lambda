@@ -5,7 +5,7 @@ import           Data.Text (Text)
 
 data Type
     = Bool
-    | Nat
+    | Int
     | Function Type Type
     deriving (Show, Eq)
 
@@ -15,8 +15,8 @@ pretty type_ =
         Bool ->
             "Bool"
 
-        Nat ->
-            "Nat"
+        Int ->
+            "Int"
 
         Function arg ret ->
             pretty arg <> " -> " <> pretty ret

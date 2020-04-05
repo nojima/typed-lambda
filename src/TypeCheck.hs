@@ -113,11 +113,11 @@ typeOfApply context pos function argument = do
             in
             Left $ TypeError errorMessage
 
-mustBeNat :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
-mustBeNat context pos hint term = do
+mustBeInt :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
+mustBeInt context pos hint term = do
     type_ <- typeOf context term
     case type_ of
-        Type.Nat ->
+        Type.Int ->
             Right ()
         other ->
             let
@@ -125,7 +125,7 @@ mustBeNat context pos hint term = do
                     T.pack (Term.sourcePosPretty pos)
                     <> ": "
                     <> hint
-                    <> " must be a natural number, but actually "
+                    <> " must be an integer, but actually "
                     <> Type.pretty other
             in
             Left $ TypeError errorMessage
@@ -151,24 +151,24 @@ typeOfBinOp :: Context -> SourcePos -> Operator -> Term -> Term -> Either TypeEr
 typeOfBinOp context pos operator lhs rhs =
     case operator of
         Term.Add -> do
-            mustBeNat context pos "the 1st argument of add operator" lhs
-            mustBeNat context pos "the 2nd argument of add operator" rhs
-            return Type.Nat
+            mustBeInt context pos "the 1st argument of add operator" lhs
+            mustBeInt context pos "the 2nd argument of add operator" rhs
+            return Type.Int
 
         Term.Sub -> do
-            mustBeNat context pos "the 1st argument of sub operator" lhs
-            mustBeNat context pos "the 2nd argument of sub operator" rhs
-            return Type.Nat
+            mustBeInt context pos "the 1st argument of sub operator" lhs
+            mustBeInt context pos "the 2nd argument of sub operator" rhs
+            return Type.Int
 
         Term.Mul -> do
-            mustBeNat context pos "the 1st argument of mul operator" lhs
-            mustBeNat context pos "the 2nd argument of mul operator" rhs
-            return Type.Nat
+            mustBeInt context pos "the 1st argument of mul operator" lhs
+            mustBeInt context pos "the 2nd argument of mul operator" rhs
+            return Type.Int
 
         Term.Div -> do
-            mustBeNat context pos "the 1st argument of div operator" lhs
-            mustBeNat context pos "the 2nd argument of div operator" rhs
-            return Type.Nat
+            mustBeInt context pos "the 1st argument of div operator" lhs
+            mustBeInt context pos "the 2nd argument of div operator" rhs
+            return Type.Int
 
         Term.And -> do
             mustBeBool context pos "the 1st argument of and operator" lhs
@@ -186,8 +186,8 @@ typeOf context term =
         Term.Bool _ _ ->
             Right Type.Bool
 
-        Term.Nat _ _ ->
-            Right Type.Nat
+        Term.Int _ _ ->
+            Right Type.Int
 
         Term.If pos condTerm thenTerm elseTerm ->
             typeOfIf context pos condTerm thenTerm elseTerm
