@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Type (Type(..), pretty) where
 
-import           Data.Text (Text)
+import Data.Text (Text)
 
 data Type
     = Bool

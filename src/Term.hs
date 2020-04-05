@@ -34,6 +34,7 @@ data Operator
     | Div -- '/'
     | And -- '&&'
     | Or  -- '||'
+    | Equal -- '=='
     deriving (Show, Eq)
 
 sourcePos :: Term -> SourcePos
@@ -118,6 +119,7 @@ operatorPretty operator =
         Div -> "/"
         And -> "&&"
         Or  -> "||"
+        Equal -> "=="
 
 indent :: Int -> Text
 indent level =

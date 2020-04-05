@@ -108,12 +108,13 @@ evalBinOp frame operator lhs rhs = do
     rhsValue <- eval frame rhs
 
     case operator of
-        Term.Add -> Value.Int  <$> ((+)  <$> toInt  lhsValue <*> toInt  rhsValue)
-        Term.Sub -> Value.Int  <$> ((-)  <$> toInt  lhsValue <*> toInt  rhsValue)
-        Term.Mul -> Value.Int  <$> ((*)  <$> toInt  lhsValue <*> toInt  rhsValue)
-        Term.Div -> Value.Int  <$> (div  <$> toInt  lhsValue <*> toInt  rhsValue)
-        Term.And -> Value.Bool <$> ((&&) <$> toBool lhsValue <*> toBool rhsValue)
-        Term.Or  -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
+        Term.Add   -> Value.Int  <$> ((+)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Sub   -> Value.Int  <$> ((-)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Mul   -> Value.Int  <$> ((*)  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.Div   -> Value.Int  <$> (div  <$> toInt  lhsValue <*> toInt  rhsValue)
+        Term.And   -> Value.Bool <$> ((&&) <$> toBool lhsValue <*> toBool rhsValue)
+        Term.Or    -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
+        Term.Equal -> return $ Value.Bool (lhsValue == rhsValue)
 
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =

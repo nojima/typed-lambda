@@ -151,34 +151,51 @@ typeOfBinOp :: Context -> SourcePos -> Operator -> Term -> Term -> Either TypeEr
 typeOfBinOp context pos operator lhs rhs =
     case operator of
         Term.Add -> do
-            mustBeInt context pos "the 1st argument of add operator" lhs
-            mustBeInt context pos "the 2nd argument of add operator" rhs
+            mustBeInt context pos "the 1st argument of `+` operator" lhs
+            mustBeInt context pos "the 2nd argument of `+` operator" rhs
             return Type.Int
 
         Term.Sub -> do
-            mustBeInt context pos "the 1st argument of sub operator" lhs
-            mustBeInt context pos "the 2nd argument of sub operator" rhs
+            mustBeInt context pos "the 1st argument of `-` operator" lhs
+            mustBeInt context pos "the 2nd argument of `-` operator" rhs
             return Type.Int
 
         Term.Mul -> do
-            mustBeInt context pos "the 1st argument of mul operator" lhs
-            mustBeInt context pos "the 2nd argument of mul operator" rhs
+            mustBeInt context pos "the 1st argument of `*` operator" lhs
+            mustBeInt context pos "the 2nd argument of `*` operator" rhs
             return Type.Int
 
         Term.Div -> do
-            mustBeInt context pos "the 1st argument of div operator" lhs
-            mustBeInt context pos "the 2nd argument of div operator" rhs
+            mustBeInt context pos "the 1st argument of `/` operator" lhs
+            mustBeInt context pos "the 2nd argument of `/` operator" rhs
             return Type.Int
 
         Term.And -> do
-            mustBeBool context pos "the 1st argument of and operator" lhs
-            mustBeBool context pos "the 2nd argument of and operator" rhs
+            mustBeBool context pos "the 1st argument of `&&` operator" lhs
+            mustBeBool context pos "the 2nd argument of `&&` operator" rhs
             return Type.Bool
 
         Term.Or -> do
-            mustBeBool context pos "the 1st argument of or operator" lhs
-            mustBeBool context pos "the 2nd argument of or operator" rhs
+            mustBeBool context pos "the 1st argument of `||` operator" lhs
+            mustBeBool context pos "the 2nd argument of `||` operator" rhs
             return Type.Bool
+
+        Term.Equal -> do
+            lhsType <- typeOf context lhs
+            rhsType <- typeOf context rhs
+            if lhsType /= rhsType then
+                let
+                    errorMessage =
+                        T.pack (Term.sourcePosPretty pos)
+                        <> ": cannot compare `"
+                        <> Type.pretty lhsType
+                        <> "` with `"
+                        <> Type.pretty rhsType
+                        <> "`"
+                in
+                Left $ TypeError errorMessage
+            else
+                return Type.Bool
 
 typeOf :: Context -> Term -> Either TypeError Type
 typeOf context term =

@@ -140,18 +140,18 @@ lambdaExpr =
         <*  symbol ":"
         <*> type_
         <*  symbol "."
-        <*> term
+        <*> expr
 
 ifExpr :: Parser Term
 ifExpr =
     Term.If
         <$> Parsec.getSourcePos
         <*  keyword "if"
-        <*> term
+        <*> expr
         <*  keyword "then"
-        <*> term
+        <*> expr
         <*  keyword "else"
-        <*> term
+        <*> expr
 
 variable :: Parser Term
 variable =
@@ -187,27 +187,28 @@ term =
         (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
         <$> successiveTerms
 
-binaryOperator :: Text -> Term.Operator -> Expr.Operator (Parsec Void Text) Term
-binaryOperator name op =
-    Expr.InfixL $
-        Term.BinOp
-            <$> Parsec.getSourcePos
-            <*> pure op
-            <*  symbol name
-
 expr :: Parser Term
 expr =
     Expr.makeExprParser
         term
-        [ [ binaryOperator "*" Term.Mul
-          , binaryOperator "/" Term.Div
+        [ [ binaryOperator Expr.InfixL "*" Term.Mul
+          , binaryOperator Expr.InfixL "/" Term.Div
           ]
-        , [ binaryOperator "+" Term.Add
-          , binaryOperator "-" Term.Sub
+        , [ binaryOperator Expr.InfixL "+" Term.Add
+          , binaryOperator Expr.InfixL "-" Term.Sub
           ]
-        , [ binaryOperator "&&" Term.And ]
-        , [ binaryOperator "||" Term.Or ]
+        , [ binaryOperator Expr.InfixL "&&" Term.And ]
+        , [ binaryOperator Expr.InfixL "||" Term.Or ]
+        , [ binaryOperator Expr.InfixN "==" Term.Equal ]
         ]
+        <?> "expression"
+    where
+        binaryOperator infix_ name op =
+            infix_ $
+                Term.BinOp
+                    <$> Parsec.getSourcePos
+                    <*> pure op
+                    <*  symbol name
 
 program :: Parser Term
 program =

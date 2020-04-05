@@ -75,6 +75,7 @@ if true then 10 else 20
 | `/` | 割り算(小数点以下切り捨て) | `Int -> Int -> Int` | 左
 | `&&` | 論理積 | `Bool -> Bool -> Bool` | 左
 | `||` | 論理和 | `Bool -> Bool -> Bool` | 左
+| `==` | 等しい | `∀a. a -> a -> Bool` | 無
 
 ### コメント
 
