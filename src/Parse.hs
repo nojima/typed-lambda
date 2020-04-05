@@ -3,7 +3,8 @@ module Parse (parse) where
 
 import           Term (Term)
 import qualified Term
-import           Identifier (Identifier(..))
+import           Identifier (Identifier)
+import qualified Identifier
 import           Type (Type)
 import qualified Type
 import qualified Data.Char as Char
@@ -14,6 +15,7 @@ import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 import qualified Text.Megaparsec.Error as Error
+import qualified Control.Monad.Combinators.Expr as Expr
 import           Data.Void (Void)
 import           Data.List (foldl1')
 import qualified Data.List.NonEmpty as NonEmpty
@@ -87,7 +89,7 @@ identifier =
             in
             Parsec.parseError err
         else
-            return $ Identifier word
+            return $ Identifier.Identifier word
     ) <?> "identifier"
 
 --------------------------------------------------------------------------------
@@ -162,7 +164,7 @@ parens =
     Parsec.between
         (symbol "(")
         (symbol ")")
-        term
+        expr
 
 term_ :: Parser Term
 term_ =
@@ -185,9 +187,31 @@ term =
         (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
         <$> successiveTerms
 
+binaryOperator :: Text -> Term.Operator -> Expr.Operator (Parsec Void Text) Term
+binaryOperator name op =
+    Expr.InfixL $
+        Term.BinOp
+            <$> Parsec.getSourcePos
+            <*> pure op
+            <*  symbol name
+
+expr :: Parser Term
+expr =
+    Expr.makeExprParser
+        term
+        [ [ binaryOperator "*" Term.Mul
+          , binaryOperator "/" Term.Div
+          ]
+        , [ binaryOperator "+" Term.Add
+          , binaryOperator "-" Term.Sub
+          ]
+        , [ binaryOperator "&&" Term.And ]
+        , [ binaryOperator "||" Term.Or ]
+        ]
+
 program :: Parser Term
 program =
-    space *> term <* Parsec.eof
+    space *> expr <* Parsec.eof
 
 --------------------------------------------------------------------------------
 

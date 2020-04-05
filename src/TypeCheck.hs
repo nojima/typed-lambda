@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TypeCheck (typeCheck, TypeError(..)) where
 
-import           Term (Term, SourcePos)
+import           Term (Term, Operator, SourcePos)
 import qualified Term
 import           Type (Type)
 import qualified Type
@@ -113,6 +113,73 @@ typeOfApply context pos function argument = do
             in
             Left $ TypeError errorMessage
 
+mustBeNat :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
+mustBeNat context pos hint term = do
+    type_ <- typeOf context term
+    case type_ of
+        Type.Nat ->
+            Right ()
+        other ->
+            let
+                errorMessage =
+                    T.pack (Term.sourcePosPretty pos)
+                    <> ": "
+                    <> hint
+                    <> " must be a natural number, but actually "
+                    <> Type.pretty other
+            in
+            Left $ TypeError errorMessage
+
+mustBeBool :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
+mustBeBool context pos hint term = do
+    type_ <- typeOf context term
+    case type_ of
+        Type.Bool ->
+            Right ()
+        other ->
+            let
+                errorMessage =
+                    T.pack (Term.sourcePosPretty pos)
+                    <> ": "
+                    <> hint
+                    <> " must be a boolean, but actually "
+                    <> Type.pretty other
+            in
+            Left $ TypeError errorMessage
+
+typeOfBinOp :: Context -> SourcePos -> Operator -> Term -> Term -> Either TypeError Type
+typeOfBinOp context pos operator lhs rhs =
+    case operator of
+        Term.Add -> do
+            mustBeNat context pos "the 1st argument of add operator" lhs
+            mustBeNat context pos "the 2nd argument of add operator" rhs
+            return Type.Nat
+
+        Term.Sub -> do
+            mustBeNat context pos "the 1st argument of sub operator" lhs
+            mustBeNat context pos "the 2nd argument of sub operator" rhs
+            return Type.Nat
+
+        Term.Mul -> do
+            mustBeNat context pos "the 1st argument of mul operator" lhs
+            mustBeNat context pos "the 2nd argument of mul operator" rhs
+            return Type.Nat
+
+        Term.Div -> do
+            mustBeNat context pos "the 1st argument of div operator" lhs
+            mustBeNat context pos "the 2nd argument of div operator" rhs
+            return Type.Nat
+
+        Term.And -> do
+            mustBeBool context pos "the 1st argument of and operator" lhs
+            mustBeBool context pos "the 2nd argument of and operator" rhs
+            return Type.Bool
+
+        Term.Or -> do
+            mustBeBool context pos "the 1st argument of or operator" lhs
+            mustBeBool context pos "the 2nd argument of or operator" rhs
+            return Type.Bool
+
 typeOf :: Context -> Term -> Either TypeError Type
 typeOf context term =
     case term of
@@ -133,6 +200,9 @@ typeOf context term =
 
         Term.Apply pos function argument ->
             typeOfApply context pos function argument
+
+        Term.BinOp pos operator lhs rhs ->
+            typeOfBinOp context pos operator lhs rhs
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eb7084141c08150ba691cf5aef018b2e00eab6a3d333ede7bcba60ad35077963
+-- hash: c722ecefc19e2ae134fa5d625d0da4be545b409fe45ec0850371c5be2ca9abcb
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -44,6 +44,7 @@ library
     , containers
     , hspec
     , megaparsec
+    , parser-combinators
     , text
   default-language: Haskell2010
 
@@ -60,6 +61,7 @@ executable typed-lambda-exe
     , containers
     , hspec
     , megaparsec
+    , parser-combinators
     , text
     , typed-lambda
   default-language: Haskell2010
@@ -79,6 +81,7 @@ test-suite typed-lambda-test
     , containers
     , hspec
     , megaparsec
+    , parser-combinators
     , text
     , typed-lambda
   default-language: Haskell2010

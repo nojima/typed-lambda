@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Eval (eval, run, RuntimeError(..)) where
 
-import           Term (Term)
+import           Term (Term, Operator)
 import qualified Term
 import           Identifier (Identifier(..))
 import           Value (Value, Frame(..))
@@ -74,6 +74,47 @@ evalApply frame function argument = do
             in
             Left $ RuntimeError errorMessage
 
+toNat :: Value -> Either RuntimeError Integer
+toNat value =
+    case value of
+        Value.Nat n ->
+            Right n
+        other ->
+            let
+                errorMessage =
+                    "a numeric value is expected, but "
+                    <> T.pack (show other)
+                    <> " is passed"
+            in
+            Left $ RuntimeError errorMessage
+
+toBool :: Value -> Either RuntimeError Bool
+toBool value =
+    case value of
+        Value.Bool b ->
+            Right b
+        other ->
+            let
+                errorMessage =
+                    "a boolean value is expected, but "
+                    <> T.pack (show other)
+                    <>" is passed"
+            in
+            Left $ RuntimeError errorMessage
+
+evalBinOp :: Frame -> Operator -> Term -> Term -> Either RuntimeError Value
+evalBinOp frame operator lhs rhs = do
+    lhsValue <- eval frame lhs
+    rhsValue <- eval frame rhs
+
+    case operator of
+        Term.Add -> Value.Nat  <$> ((+)  <$> toNat  lhsValue <*> toNat  rhsValue)
+        Term.Sub -> Value.Nat  <$> ((-)  <$> toNat  lhsValue <*> toNat  rhsValue)
+        Term.Mul -> Value.Nat  <$> ((*)  <$> toNat  lhsValue <*> toNat  rhsValue)
+        Term.Div -> Value.Nat  <$> (div  <$> toNat  lhsValue <*> toNat  rhsValue)
+        Term.And -> Value.Bool <$> ((&&) <$> toBool lhsValue <*> toBool rhsValue)
+        Term.Or  -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
+
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
@@ -94,6 +135,9 @@ eval frame term =
 
         Term.Apply _ function argument ->
             evalApply frame function argument
+
+        Term.BinOp _ operator lhs rhs ->
+            evalBinOp frame operator lhs rhs
 
 run :: Term -> Either RuntimeError Value
 run term =
