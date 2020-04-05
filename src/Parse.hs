@@ -77,15 +77,15 @@ identifierOrKeyword =
 identifier :: Parser Identifier
 identifier =
     Parsec.try (do
+        offset <- Parsec.getOffset
         word <- identifierOrKeyword
         if Set.member word keywords then
             let
                 actual = Error.Tokens (NonEmpty.fromList (T.unpack word))
                 expected = Error.Label (NonEmpty.fromList "identifier")
+                err = Error.TrivialError offset (Just actual) (Set.singleton expected)
             in
-            Parsec.failure
-                (Just actual)
-                (Set.singleton expected)
+            Parsec.parseError err
         else
             return $ Identifier word
     ) <?> "identifier"
