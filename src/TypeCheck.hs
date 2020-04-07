@@ -12,6 +12,7 @@ import qualified Data.Text as T
 import qualified Data.Map.Strict as Map
 import qualified Control.Monad.State.Strict as State
 import qualified Control.Monad.Except as Except
+import Debug.Trace
 
 newtype TypeError = TypeError Text
 
@@ -30,14 +31,19 @@ unify type1 type2 =
     if type1 == type2 then
         return ()
     else
+      trace (show (Type.pretty type1, Type.pretty type2)) $
         case (type1, type2) of
-            (Type.Variable v1, _) ->
+            (Type.Variable v1, _) | doesNotOccur v1 type2 -> do
+                updateEnv $ substituteEnv v1 type2
                 updateEnv $ Map.insert v1 type2
-            (_, Type.Variable v2) ->
+            (_, Type.Variable v2) | doesNotOccur v2 type1 -> do
+                updateEnv $ substituteEnv v2 type1
                 updateEnv $ Map.insert v2 type1
             (Type.Function arg1 ret1, Type.Function arg2 ret2) -> do
                 unify arg1 arg2
-                unify ret1 ret2
+                ret1' <- substitute ret1
+                ret2' <- substitute ret2
+                unify ret1' ret2'
             _ ->
                 let
                     errorMessage =
@@ -49,6 +55,15 @@ unify type1 type2 =
                 in
                 Except.throwError $ TypeError errorMessage
 
+doesNotOccur :: Identifier -> Type -> Bool
+doesNotOccur identifier type_ =
+    case type_ of
+        Type.Function arg ret ->
+            doesNotOccur identifier arg || doesNotOccur identifier ret
+        Type.Variable identifier_ ->
+            identifier /= identifier_
+        _ -> True
+
 getEnv :: TypeChecker Environment
 getEnv =
     stateEnv <$> State.get
@@ -58,6 +73,12 @@ updateEnv f = do
     state <- State.get
     let newEnv = f (stateEnv state)
     State.put $ state { stateEnv = newEnv }
+
+showEnv :: Environment -> Text
+showEnv env =
+    (T.pack . show)
+        (Map.mapKeys (T.unpack . Identifier.name)
+            (Map.map (T.unpack . Type.pretty) env))
 
 withNestedEnv :: Identifier -> Type -> TypeChecker a -> TypeChecker a
 withNestedEnv name type_ action = do
@@ -90,13 +111,29 @@ substitute type_ =
                 Just t ->
                     substitute t
 
-newTypeVariable :: TypeChecker Type
-newTypeVariable = do
+substituteType :: Identifier -> Type -> Type -> Type
+substituteType identifier type_ target =
+    case target of
+        Type.Function arg ret ->
+            Type.Function
+                (substituteType identifier type_ arg)
+                (substituteType identifier type_ ret)
+        Type.Variable identifier_ | identifier_ == identifier ->
+            type_
+        _ ->
+            target
+
+substituteEnv :: Identifier -> Type -> Environment -> Environment
+substituteEnv identifier type_ =
+    Map.map (substituteType identifier type_)
+
+newSymbol :: TypeChecker Identifier
+newSymbol = do
     state <- State.get
     let nextId = stateNextId state
     let identifier = Identifier.Identifier $ T.pack $ 't' : show nextId
     State.put $ state { stateNextId = nextId + 1 }
-    return $ Type.Variable identifier
+    return identifier
 
 lookupVariable :: Identifier -> TypeChecker (Maybe Type)
 lookupVariable identifier =
@@ -132,16 +169,18 @@ typeOfIf _ condTerm thenTerm elseTerm = do
 
 typeOfLambda :: SourcePos -> Identifier -> Term -> TypeChecker Type
 typeOfLambda _ argumentName body = do
-    argumentType <- newTypeVariable
+    argumentType <- Type.Variable <$> newSymbol
     bodyType <- withNestedEnv argumentName argumentType (typeOf body)
-    return $ Type.Function argumentType bodyType
+    let functionType_ = Type.Function argumentType bodyType
+    substitute functionType_
 
 typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
 typeOfApply pos function argument = do
     argumentType <- typeOf argument
     functionType <- typeOf function
 
-    retType <- newTypeVariable
+    symbol <- newSymbol
+    let retType = Type.Variable symbol
     unify (Type.Function argumentType retType) functionType
 
     substitute retType
@@ -201,31 +240,36 @@ typeOfLet _ name expr body = do
     withNestedEnv name type_ (typeOf body)
 
 typeOf :: Term -> TypeChecker Type
-typeOf term =
-    case term of
-        Term.Bool _ _ ->
-            return Type.Bool
+typeOf term = do
+    r <-
+        case term of
+            Term.Bool _ _ ->
+                return Type.Bool
 
-        Term.Int _ _ ->
-            return Type.Int
+            Term.Int _ _ ->
+                return Type.Int
 
-        Term.If pos condTerm thenTerm elseTerm ->
-            typeOfIf pos condTerm thenTerm elseTerm
+            Term.If pos condTerm thenTerm elseTerm ->
+                typeOfIf pos condTerm thenTerm elseTerm
 
-        Term.Variable pos identifier ->
-            typeOfVariable pos identifier
+            Term.Variable pos identifier ->
+                typeOfVariable pos identifier
 
-        Term.Lambda pos argumentName body ->
-            typeOfLambda pos argumentName body
+            Term.Lambda pos argumentName body ->
+                typeOfLambda pos argumentName body
 
-        Term.Apply pos function argument ->
-            typeOfApply pos function argument
+            Term.Apply pos function argument ->
+                typeOfApply pos function argument
 
-        Term.BinOp pos operator lhs rhs ->
-            typeOfBinOp pos operator lhs rhs
+            Term.BinOp pos operator lhs rhs ->
+                typeOfBinOp pos operator lhs rhs
 
-        Term.Let pos name expr body ->
-            typeOfLet pos name expr body
+            Term.Let pos name expr body ->
+                typeOfLet pos name expr body
+
+    env <- getEnv
+    trace (T.unpack $ "Term: " <> Term.pretty 1 term <> "\nType: " <> Type.pretty r <> "\nEnv: " <> showEnv env <> "\n")
+        (return r)
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =
