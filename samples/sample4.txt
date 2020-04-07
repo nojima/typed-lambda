@@ -1,9 +1,9 @@
-(lambda tru : Bool -> Bool -> Bool .
-  (lambda fls : Bool -> Bool -> Bool .
+(lambda tru.
+  (lambda fls.
     tru (fls true false) true))
-(lambda x : Bool .   -- tru
-  (lambda y : Bool .
+(lambda x.   -- tru
+  (lambda y.
     x))
-(lambda x : Bool .   -- fls
-  (lambda y : Bool .
+(lambda x.   -- fls
+  (lambda y.
     y))

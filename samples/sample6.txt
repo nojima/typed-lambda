@@ -1,5 +1,5 @@
-(lambda x : Int .
-    lambda y : Int .
-        lambda z : Bool .
+(lambda x .
+    lambda y .
+        lambda z .
             if z then x else y
 ) 42 33 false

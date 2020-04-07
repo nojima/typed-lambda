@@ -1,4 +1,4 @@
-(lambda first : Bool .
-    lambda second : Bool .
+(lambda first.
+    lambda second.
         first
 ) true false

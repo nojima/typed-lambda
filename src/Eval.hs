@@ -138,7 +138,7 @@ eval frame term =
         Term.Variable _ identifier ->
             evalVariable frame identifier
 
-        Term.Lambda _ identifier _ body ->
+        Term.Lambda _ identifier body ->
             Right $ Value.Closure frame identifier body
 
         Term.Apply _ function argument ->

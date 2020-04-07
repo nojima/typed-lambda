@@ -96,28 +96,6 @@ identifier =
 
 --------------------------------------------------------------------------------
 
-boolType :: Parser Type
-boolType =
-    Type.Bool <$ keyword "Bool"
-
-natType :: Parser Type
-natType =
-    Type.Int <$ keyword "Int"
-
-atomicType :: Parser Type
-atomicType =
-    Parsec.choice
-        [ boolType
-        , natType
-        ]
-
-type_ :: Parser Type
-type_ =
-    let
-        types = atomicType `Parsec.sepBy1` symbol "->"
-    in
-    foldr1 Type.Function <$> types
-
 boolLiteral :: Parser Term
 boolLiteral =
     Term.Bool
@@ -139,8 +117,6 @@ lambdaExpr =
         <$> Parsec.getSourcePos
         <*  keyword "lambda"
         <*> identifier
-        <*  symbol ":"
-        <*> type_
         <*  symbol "."
         <*> expr
 

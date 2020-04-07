@@ -1,4 +1,4 @@
 -- Simply apply lambda
-(lambda x: Bool.
+(lambda x.
     x
 ) true

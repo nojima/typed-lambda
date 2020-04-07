@@ -88,7 +88,7 @@ substitute type_ =
                 Nothing ->
                     return type_
                 Just t ->
-                    return t
+                    substitute t
 
 newTypeVariable :: TypeChecker Type
 newTypeVariable = do
@@ -120,7 +120,7 @@ typeOfVariable pos identifier = do
             return type_
 
 typeOfIf :: SourcePos -> Term -> Term -> Term -> TypeChecker Type
-typeOfIf pos condTerm thenTerm elseTerm = do
+typeOfIf _ condTerm thenTerm elseTerm = do
     condType <- typeOf condTerm
     unify Type.Bool condType
 
@@ -130,67 +130,31 @@ typeOfIf pos condTerm thenTerm elseTerm = do
 
     substitute thenType
 
-typeOfLambda :: SourcePos -> Identifier -> Type -> Term -> TypeChecker Type
-typeOfLambda _ argumentName _ body = do
+typeOfLambda :: SourcePos -> Identifier -> Term -> TypeChecker Type
+typeOfLambda _ argumentName body = do
     argumentType <- newTypeVariable
     bodyType <- withNestedEnv argumentName argumentType (typeOf body)
     return $ Type.Function argumentType bodyType
 
 typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
 typeOfApply pos function argument = do
-    functionType <- typeOf function
     argumentType <- typeOf argument
+    functionType <- typeOf function
 
-    case functionType of
-        Type.Function expectedArgumentType bodyType -> do
-            unify expectedArgumentType argumentType
-            substitute bodyType
+    retType <- newTypeVariable
+    unify (Type.Function argumentType retType) functionType
 
-        type_ ->
-            let
-                errorMessage =
-                    T.pack (Term.sourcePosPretty pos)
-                    <> ": cannot apply non-function '"
-                    <> Type.pretty type_
-                    <> "'"
-            in
-            Except.throwError $ TypeError errorMessage
+    substitute retType
 
 mustBeInt :: SourcePos -> Text -> Term -> TypeChecker ()
 mustBeInt pos hint term = do
     type_ <- typeOf term
     unify Type.Int type_
-    case type_ of
-        Type.Int ->
-            return ()
-        other ->
-            let
-                errorMessage =
-                    T.pack (Term.sourcePosPretty pos)
-                    <> ": "
-                    <> hint
-                    <> " must be an integer, but actually "
-                    <> Type.pretty other
-            in
-            Except.throwError $ TypeError errorMessage
 
 mustBeBool :: SourcePos -> Text -> Term -> TypeChecker ()
 mustBeBool pos hint term = do
     type_ <- typeOf term
     unify Type.Bool type_
-    case type_ of
-        Type.Bool ->
-            return ()
-        other ->
-            let
-                errorMessage =
-                    T.pack (Term.sourcePosPretty pos)
-                    <> ": "
-                    <> hint
-                    <> " must be a boolean, but actually "
-                    <> Type.pretty other
-            in
-            Except.throwError $ TypeError errorMessage
 
 typeOfBinOp :: SourcePos -> Operator -> Term -> Term -> TypeChecker Type
 typeOfBinOp pos operator lhs rhs =
@@ -251,8 +215,8 @@ typeOf term =
         Term.Variable pos identifier ->
             typeOfVariable pos identifier
 
-        Term.Lambda pos argumentName argumentType body ->
-            typeOfLambda pos argumentName argumentType body
+        Term.Lambda pos argumentName body ->
+            typeOfLambda pos argumentName body
 
         Term.Apply pos function argument ->
             typeOfApply pos function argument

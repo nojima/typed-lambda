@@ -22,7 +22,7 @@ data Term
     | Int      SourcePos Integer
     | If       SourcePos Term Term Term
     | Variable SourcePos Identifier
-    | Lambda   SourcePos Identifier Type Term
+    | Lambda   SourcePos Identifier Term
     | Apply    SourcePos Term Term
     | BinOp    SourcePos Operator Term Term
     | Let      SourcePos Identifier Term Term
@@ -45,7 +45,7 @@ sourcePos term =
         Int sp _ -> sp
         If sp _ _ _ -> sp
         Variable sp _ -> sp
-        Lambda sp _ _ _ -> sp
+        Lambda sp _ _ -> sp
         Apply sp _ _ -> sp
         BinOp sp _ _ _ -> sp
         Let sp _ _ _ -> sp
@@ -57,7 +57,7 @@ mapSourcePos f term =
         Int sp nat -> Int (f sp) nat
         If sp c t e -> If (f sp) (mapSourcePos f c) (mapSourcePos f t) (mapSourcePos f e)
         Variable sp i -> Variable (f sp) i
-        Lambda sp a t b -> Lambda (f sp) a t (mapSourcePos f b)
+        Lambda sp a b -> Lambda (f sp) a (mapSourcePos f b)
         Apply sp fn a -> Apply (f sp) (mapSourcePos f fn) (mapSourcePos f a)
         BinOp sp op t1 t2 -> BinOp (f sp) op (mapSourcePos f t1) (mapSourcePos f t2)
         Let sp vn ve b -> Let (f sp) vn (mapSourcePos f ve) (mapSourcePos f b)
@@ -85,11 +85,9 @@ pretty indentLevel term =
         Variable _ identifier ->
             Identifier.name identifier
 
-        Lambda _ argumentName argumentType body ->
+        Lambda _ argumentName body ->
             "(LAMBDA "
             <> Identifier.name argumentName
-            <> " : "
-            <> Type.pretty argumentType
             <> " .\n"
             <> indent indentLevel
             <> pretty (indentLevel + 1) body

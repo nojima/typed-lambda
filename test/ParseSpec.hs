@@ -4,7 +4,6 @@ module ParseSpec where
 import           Parse
 import           Term (Term)
 import qualified Term
-import qualified Type
 import qualified Text.Megaparsec.Pos as ParsecPos
 import           Test.Hspec
 import qualified Data.Either as Either
@@ -45,20 +44,20 @@ spec =
         context "lambda expression" $ do
             it "can pares lambda expression" $
                 parse "lambda hoge : Bool . foo" `shouldSuccess`
-                    Term.Lambda x "hoge" Type.Bool (Term.Variable x "foo")
+                    Term.Lambda x "hoge" (Term.Variable x "foo")
 
             it "can apply lambda" $
                 parse "(lambda hoge : Bool . hoge) 10" `shouldSuccess`
                     Term.Apply x
-                        (Term.Lambda x "hoge" Type.Bool (Term.Variable x "hoge"))
+                        (Term.Lambda x "hoge" (Term.Variable x "hoge"))
                         (Term.Int x 10)
 
             it "can apply multiple argument" $
                 parse "(lambda hoge : Bool . lambda fuga : Int . fuga) true 10" `shouldSuccess`
                     Term.Apply x
                         (Term.Apply x
-                            (Term.Lambda x "hoge" Type.Bool
-                                (Term.Lambda x "fuga" Type.Int
+                            (Term.Lambda x "hoge"
+                                (Term.Lambda x "fuga"
                                     (Term.Variable x "fuga")
                                 )
                             )
