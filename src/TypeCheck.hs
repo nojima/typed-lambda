@@ -35,6 +35,20 @@ updateEnv f = do
     let newEnv = f (stateEnv state)
     State.put $ state { stateEnv = newEnv }
 
+withNestedEnv :: Identifier -> Type -> TypeChecker a -> TypeChecker a
+withNestedEnv name type_ action = do
+    -- Keep old type before update
+    old <- Map.lookup name <$> getEnv
+
+    -- Update env, and then call the action
+    updateEnv $ Map.insert name type_
+    result <- action
+
+    -- Restore env
+    updateEnv $ Map.update (const old) name
+
+    return result
+
 lookupVariable :: Identifier -> TypeChecker (Maybe Type)
 lookupVariable identifier =
     Map.lookup identifier <$> getEnv
@@ -89,28 +103,9 @@ typeOfIf pos condTerm thenTerm elseTerm = do
     else
         return thenType
 
-validateUniqunessOfVariableName :: SourcePos -> Identifier -> TypeChecker ()
-validateUniqunessOfVariableName pos identifier = do
-    maybeType <- lookupVariable identifier
-    case maybeType of
-        Just _ ->
-            let
-                errorMessage =
-                    T.pack (Term.sourcePosPretty pos)
-                    <> ": the variable name must be different from each other. "
-                    <> "This restriction will be eliminated in the future."
-            in
-            Except.throwError $ TypeError errorMessage
-        Nothing ->
-            return ()
-
 typeOfLambda :: SourcePos -> Identifier -> Type -> Term -> TypeChecker Type
-typeOfLambda pos argumentName argumentType body = do
-    -- TODO: この制限を緩和する
-    validateUniqunessOfVariableName pos argumentName
-
-    updateEnv $ Map.insert argumentName argumentType
-    bodyType <- typeOf body
+typeOfLambda _ argumentName argumentType body = do
+    bodyType <- withNestedEnv argumentName argumentType (typeOf body)
     return $ Type.Function argumentType bodyType
 
 typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
@@ -231,13 +226,9 @@ typeOfBinOp pos operator lhs rhs =
                 return Type.Bool
 
 typeOfLet :: SourcePos -> Identifier -> Term -> Term -> TypeChecker Type
-typeOfLet pos name expr body = do
-    -- TODO: この制限を緩和する
-    validateUniqunessOfVariableName pos name
-
+typeOfLet _ name expr body = do
     type_ <- typeOf expr
-    updateEnv $ Map.insert name type_
-    typeOf body
+    withNestedEnv name type_ (typeOf body)
 
 typeOf :: Term -> TypeChecker Type
 typeOf term =
