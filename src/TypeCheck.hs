@@ -9,24 +9,40 @@ import           Identifier (Identifier)
 import qualified Identifier
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Map.Strict as Map
+import qualified Control.Monad.State.Strict as State
+import qualified Control.Monad.Except as Except
 
 newtype TypeError = TypeError Text
 
-data Context = Context
-    { variableName  :: Identifier
-    , variableType  :: Type
-    , parentContext :: Maybe Context
+type Environment = Map.Map Identifier Type
+
+data TypingState = TypingState
+    { stateNextId :: !Int
+    , stateEnv :: Environment
     }
+    deriving (Show, Eq)
 
-lookupVariable :: Identifier -> Context -> Maybe Type
-lookupVariable identifier context =
-    if variableName context == identifier
-        then Just $ variableType context
-        else lookupVariable identifier =<< parentContext context
+type TypeChecker a = Except.ExceptT TypeError (State.State TypingState) a
 
-typeOfVariable :: Context -> SourcePos -> Identifier -> Either TypeError Type
-typeOfVariable context pos identifier =
-    case lookupVariable identifier context of
+getEnv :: TypeChecker Environment
+getEnv =
+    stateEnv <$> State.get
+
+updateEnv :: (Environment -> Environment) -> TypeChecker ()
+updateEnv f = do
+    state <- State.get
+    let newEnv = f (stateEnv state)
+    State.put $ state { stateEnv = newEnv }
+
+lookupVariable :: Identifier -> TypeChecker (Maybe Type)
+lookupVariable identifier =
+    Map.lookup identifier <$> getEnv
+
+typeOfVariable :: SourcePos -> Identifier -> TypeChecker Type
+typeOfVariable pos identifier = do
+    maybeType <- lookupVariable identifier
+    case maybeType of
         Nothing ->
             let
                 errorMessage =
@@ -35,16 +51,16 @@ typeOfVariable context pos identifier =
                     <> Identifier.name identifier
                     <> "'"
             in
-            Left $ TypeError errorMessage
+            Except.throwError $ TypeError errorMessage
 
         Just type_ ->
-            Right type_
+            return type_
 
-typeOfIf :: Context -> SourcePos -> Term -> Term -> Term -> Either TypeError Type
-typeOfIf context pos condTerm thenTerm elseTerm = do
-    condType <- typeOf context condTerm
-    thenType <- typeOf context thenTerm
-    elseType <- typeOf context elseTerm
+typeOfIf :: SourcePos -> Term -> Term -> Term -> TypeChecker Type
+typeOfIf pos condTerm thenTerm elseTerm = do
+    condType <- typeOf condTerm
+    thenType <- typeOf thenTerm
+    elseType <- typeOf elseTerm
 
     if condType /= Type.Bool then
         let
@@ -54,7 +70,7 @@ typeOfIf context pos condTerm thenTerm elseTerm = do
                 <> Type.pretty condType
                 <> "' used as `if` condition"
         in
-        Left $ TypeError errorMessage
+        Except.throwError $ TypeError errorMessage
 
     else if thenType /= elseType then
         let
@@ -68,27 +84,44 @@ typeOfIf context pos condTerm thenTerm elseTerm = do
                 <> Type.pretty elseType
                 <> "\n"
         in
-        Left $ TypeError errorMessage
+        Except.throwError $ TypeError errorMessage
 
     else
-        Right thenType
+        return thenType
 
-typeOfLambda :: Context -> Identifier -> Type -> Term -> Either TypeError Type
-typeOfLambda context argumentName argumentType body =
-    let
-        newContext = Context argumentName argumentType (Just context)
-    in
-    Type.Function argumentType <$> typeOf newContext body
+validateUniqunessOfVariableName :: SourcePos -> Identifier -> TypeChecker ()
+validateUniqunessOfVariableName pos identifier = do
+    maybeType <- lookupVariable identifier
+    case maybeType of
+        Just _ ->
+            let
+                errorMessage =
+                    T.pack (Term.sourcePosPretty pos)
+                    <> ": the variable name must be different from each other. "
+                    <> "This restriction will be eliminated in the future."
+            in
+            Except.throwError $ TypeError errorMessage
+        Nothing ->
+            return ()
 
-typeOfApply :: Context -> SourcePos -> Term -> Term -> Either TypeError Type
-typeOfApply context pos function argument = do
-    functionType <- typeOf context function
-    argumentType <- typeOf context argument
+typeOfLambda :: SourcePos -> Identifier -> Type -> Term -> TypeChecker Type
+typeOfLambda pos argumentName argumentType body = do
+    -- TODO: この制限を緩和する
+    validateUniqunessOfVariableName pos argumentName
+
+    updateEnv $ Map.insert argumentName argumentType
+    bodyType <- typeOf body
+    return $ Type.Function argumentType bodyType
+
+typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
+typeOfApply pos function argument = do
+    functionType <- typeOf function
+    argumentType <- typeOf argument
 
     case functionType of
         Type.Function expectedArgumentType bodyType ->
             if expectedArgumentType == argumentType then
-                Right bodyType
+                return bodyType
             else
                 let
                     errorMessage =
@@ -101,7 +134,7 @@ typeOfApply context pos function argument = do
                         <> Type.pretty argumentType
                         <> "\n"
                 in
-                Left $ TypeError errorMessage
+                Except.throwError $ TypeError errorMessage
 
         type_ ->
             let
@@ -111,14 +144,14 @@ typeOfApply context pos function argument = do
                     <> Type.pretty type_
                     <> "'"
             in
-            Left $ TypeError errorMessage
+            Except.throwError $ TypeError errorMessage
 
-mustBeInt :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
-mustBeInt context pos hint term = do
-    type_ <- typeOf context term
+mustBeInt :: SourcePos -> Text -> Term -> TypeChecker ()
+mustBeInt pos hint term = do
+    type_ <- typeOf term
     case type_ of
         Type.Int ->
-            Right ()
+            return ()
         other ->
             let
                 errorMessage =
@@ -128,14 +161,14 @@ mustBeInt context pos hint term = do
                     <> " must be an integer, but actually "
                     <> Type.pretty other
             in
-            Left $ TypeError errorMessage
+            Except.throwError $ TypeError errorMessage
 
-mustBeBool :: Context -> SourcePos -> Text -> Term -> Either TypeError ()
-mustBeBool context pos hint term = do
-    type_ <- typeOf context term
+mustBeBool :: SourcePos -> Text -> Term -> TypeChecker ()
+mustBeBool pos hint term = do
+    type_ <- typeOf term
     case type_ of
         Type.Bool ->
-            Right ()
+            return ()
         other ->
             let
                 errorMessage =
@@ -145,44 +178,44 @@ mustBeBool context pos hint term = do
                     <> " must be a boolean, but actually "
                     <> Type.pretty other
             in
-            Left $ TypeError errorMessage
+            Except.throwError $ TypeError errorMessage
 
-typeOfBinOp :: Context -> SourcePos -> Operator -> Term -> Term -> Either TypeError Type
-typeOfBinOp context pos operator lhs rhs =
+typeOfBinOp :: SourcePos -> Operator -> Term -> Term -> TypeChecker Type
+typeOfBinOp pos operator lhs rhs =
     case operator of
         Term.Add -> do
-            mustBeInt context pos "the 1st argument of `+` operator" lhs
-            mustBeInt context pos "the 2nd argument of `+` operator" rhs
+            mustBeInt pos "the 1st argument of `+` operator" lhs
+            mustBeInt pos "the 2nd argument of `+` operator" rhs
             return Type.Int
 
         Term.Sub -> do
-            mustBeInt context pos "the 1st argument of `-` operator" lhs
-            mustBeInt context pos "the 2nd argument of `-` operator" rhs
+            mustBeInt pos "the 1st argument of `-` operator" lhs
+            mustBeInt pos "the 2nd argument of `-` operator" rhs
             return Type.Int
 
         Term.Mul -> do
-            mustBeInt context pos "the 1st argument of `*` operator" lhs
-            mustBeInt context pos "the 2nd argument of `*` operator" rhs
+            mustBeInt pos "the 1st argument of `*` operator" lhs
+            mustBeInt pos "the 2nd argument of `*` operator" rhs
             return Type.Int
 
         Term.Div -> do
-            mustBeInt context pos "the 1st argument of `/` operator" lhs
-            mustBeInt context pos "the 2nd argument of `/` operator" rhs
+            mustBeInt pos "the 1st argument of `/` operator" lhs
+            mustBeInt pos "the 2nd argument of `/` operator" rhs
             return Type.Int
 
         Term.And -> do
-            mustBeBool context pos "the 1st argument of `&&` operator" lhs
-            mustBeBool context pos "the 2nd argument of `&&` operator" rhs
+            mustBeBool pos "the 1st argument of `&&` operator" lhs
+            mustBeBool pos "the 2nd argument of `&&` operator" rhs
             return Type.Bool
 
         Term.Or -> do
-            mustBeBool context pos "the 1st argument of `||` operator" lhs
-            mustBeBool context pos "the 2nd argument of `||` operator" rhs
+            mustBeBool pos "the 1st argument of `||` operator" lhs
+            mustBeBool pos "the 2nd argument of `||` operator" rhs
             return Type.Bool
 
         Term.Equal -> do
-            lhsType <- typeOf context lhs
-            rhsType <- typeOf context rhs
+            lhsType <- typeOf lhs
+            rhsType <- typeOf rhs
             if lhsType /= rhsType then
                 let
                     errorMessage =
@@ -193,46 +226,48 @@ typeOfBinOp context pos operator lhs rhs =
                         <> Type.pretty rhsType
                         <> "`"
                 in
-                Left $ TypeError errorMessage
+                Except.throwError $ TypeError errorMessage
             else
                 return Type.Bool
 
-typeOfLet :: Context -> Identifier -> Term -> Term -> Either TypeError Type
-typeOfLet context name expr body = do
-    type_ <- typeOf context expr
-    let newContext = Context name type_ (Just context)
-    typeOf newContext body
+typeOfLet :: SourcePos -> Identifier -> Term -> Term -> TypeChecker Type
+typeOfLet pos name expr body = do
+    -- TODO: この制限を緩和する
+    validateUniqunessOfVariableName pos name
 
-typeOf :: Context -> Term -> Either TypeError Type
-typeOf context term =
+    type_ <- typeOf expr
+    updateEnv $ Map.insert name type_
+    typeOf body
+
+typeOf :: Term -> TypeChecker Type
+typeOf term =
     case term of
         Term.Bool _ _ ->
-            Right Type.Bool
+            return Type.Bool
 
         Term.Int _ _ ->
-            Right Type.Int
+            return Type.Int
 
         Term.If pos condTerm thenTerm elseTerm ->
-            typeOfIf context pos condTerm thenTerm elseTerm
+            typeOfIf pos condTerm thenTerm elseTerm
 
         Term.Variable pos identifier ->
-            typeOfVariable context pos identifier
+            typeOfVariable pos identifier
 
-        Term.Lambda _ argumentName argumentType body ->
-            typeOfLambda context argumentName argumentType body
+        Term.Lambda pos argumentName argumentType body ->
+            typeOfLambda pos argumentName argumentType body
 
         Term.Apply pos function argument ->
-            typeOfApply context pos function argument
+            typeOfApply pos function argument
 
         Term.BinOp pos operator lhs rhs ->
-            typeOfBinOp context pos operator lhs rhs
+            typeOfBinOp pos operator lhs rhs
 
-        Term.Let _ name expr body ->
-            typeOfLet context name expr body
+        Term.Let pos name expr body ->
+            typeOfLet pos name expr body
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =
-    let
-        rootContext = Context (Identifier.Identifier "") Type.Bool Nothing
-    in
-    typeOf rootContext term
+    State.evalState
+        (Except.runExceptT (typeOf term))
+        TypingState { stateNextId = 0, stateEnv = Map.empty }
