@@ -25,6 +25,30 @@ data TypingState = TypingState
 
 type TypeChecker a = Except.ExceptT TypeError (State.State TypingState) a
 
+unify :: Type -> Type -> TypeChecker ()
+unify type1 type2 =
+    if type1 == type2 then
+        return ()
+    else
+        case (type1, type2) of
+            (Type.Variable v1, _) ->
+                updateEnv $ Map.insert v1 type2
+            (_, Type.Variable v2) ->
+                updateEnv $ Map.insert v2 type1
+            (Type.Function arg1 ret1, Type.Function arg2 ret2) -> do
+                unify arg1 arg2
+                unify ret1 ret2
+            _ ->
+                let
+                    errorMessage =
+                        "unification failed: "
+                        <> "type1 = "
+                        <> Type.pretty type1
+                        <> ", type2 = "
+                        <> Type.pretty type2
+                in
+                Except.throwError $ TypeError errorMessage
+
 getEnv :: TypeChecker Environment
 getEnv =
     stateEnv <$> State.get
@@ -48,6 +72,31 @@ withNestedEnv name type_ action = do
     updateEnv $ Map.update (const old) name
 
     return result
+
+substitute :: Type -> TypeChecker Type
+substitute type_ =
+    case type_ of
+        Type.Bool ->
+            return type_
+        Type.Int ->
+            return type_
+        Type.Function arg ret ->
+            Type.Function <$> substitute arg <*> substitute ret
+        Type.Variable identifier -> do
+            maybeType <- Map.lookup identifier <$> getEnv
+            case maybeType of
+                Nothing ->
+                    return type_
+                Just t ->
+                    return t
+
+newTypeVariable :: TypeChecker Type
+newTypeVariable = do
+    state <- State.get
+    let nextId = stateNextId state
+    let identifier = Identifier.Identifier $ T.pack $ 't' : show nextId
+    State.put $ state { stateNextId = nextId + 1 }
+    return $ Type.Variable identifier
 
 lookupVariable :: Identifier -> TypeChecker (Maybe Type)
 lookupVariable identifier =
@@ -73,38 +122,17 @@ typeOfVariable pos identifier = do
 typeOfIf :: SourcePos -> Term -> Term -> Term -> TypeChecker Type
 typeOfIf pos condTerm thenTerm elseTerm = do
     condType <- typeOf condTerm
+    unify Type.Bool condType
+
     thenType <- typeOf thenTerm
     elseType <- typeOf elseTerm
+    unify thenType elseType
 
-    if condType /= Type.Bool then
-        let
-            errorMessage =
-                T.pack (Term.sourcePosPretty pos)
-                <> ": non-bool '"
-                <> Type.pretty condType
-                <> "' used as `if` condition"
-        in
-        Except.throwError $ TypeError errorMessage
-
-    else if thenType /= elseType then
-        let
-            errorMessage =
-                T.pack (Term.sourcePosPretty pos)
-                <> ": `then` and `else` have incompatible types.\n"
-                <> "  then: "
-                <> Type.pretty thenType
-                <> "\n"
-                <> "  else: "
-                <> Type.pretty elseType
-                <> "\n"
-        in
-        Except.throwError $ TypeError errorMessage
-
-    else
-        return thenType
+    substitute thenType
 
 typeOfLambda :: SourcePos -> Identifier -> Type -> Term -> TypeChecker Type
-typeOfLambda _ argumentName argumentType body = do
+typeOfLambda _ argumentName _ body = do
+    argumentType <- newTypeVariable
     bodyType <- withNestedEnv argumentName argumentType (typeOf body)
     return $ Type.Function argumentType bodyType
 
@@ -114,22 +142,9 @@ typeOfApply pos function argument = do
     argumentType <- typeOf argument
 
     case functionType of
-        Type.Function expectedArgumentType bodyType ->
-            if expectedArgumentType == argumentType then
-                return bodyType
-            else
-                let
-                    errorMessage =
-                        T.pack (Term.sourcePosPretty pos)
-                        <> ": function argument has a incompatible type:\n"
-                        <> "  expected: "
-                        <> Type.pretty expectedArgumentType
-                        <> "\n"
-                        <> "  acutally: "
-                        <> Type.pretty argumentType
-                        <> "\n"
-                in
-                Except.throwError $ TypeError errorMessage
+        Type.Function expectedArgumentType bodyType -> do
+            unify expectedArgumentType argumentType
+            substitute bodyType
 
         type_ ->
             let
@@ -144,6 +159,7 @@ typeOfApply pos function argument = do
 mustBeInt :: SourcePos -> Text -> Term -> TypeChecker ()
 mustBeInt pos hint term = do
     type_ <- typeOf term
+    unify Type.Int type_
     case type_ of
         Type.Int ->
             return ()
@@ -161,6 +177,7 @@ mustBeInt pos hint term = do
 mustBeBool :: SourcePos -> Text -> Term -> TypeChecker ()
 mustBeBool pos hint term = do
     type_ <- typeOf term
+    unify Type.Bool type_
     case type_ of
         Type.Bool ->
             return ()
@@ -211,19 +228,8 @@ typeOfBinOp pos operator lhs rhs =
         Term.Equal -> do
             lhsType <- typeOf lhs
             rhsType <- typeOf rhs
-            if lhsType /= rhsType then
-                let
-                    errorMessage =
-                        T.pack (Term.sourcePosPretty pos)
-                        <> ": cannot compare `"
-                        <> Type.pretty lhsType
-                        <> "` with `"
-                        <> Type.pretty rhsType
-                        <> "`"
-                in
-                Except.throwError $ TypeError errorMessage
-            else
-                return Type.Bool
+            unify lhsType rhsType
+            return Type.Bool
 
 typeOfLet :: SourcePos -> Identifier -> Term -> Term -> TypeChecker Type
 typeOfLet _ name expr body = do
@@ -261,4 +267,4 @@ typeCheck :: Term -> Either TypeError Type
 typeCheck term =
     State.evalState
         (Except.runExceptT (typeOf term))
-        TypingState { stateNextId = 0, stateEnv = Map.empty }
+        TypingState { stateNextId = 1, stateEnv = Map.empty }

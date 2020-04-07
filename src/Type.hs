@@ -4,14 +4,15 @@ module Type
     , pretty
     ) where
 
+import           Identifier (Identifier)
+import qualified Identifier
 import           Data.Text (Text)
-import qualified Data.Text as T
 
 data Type
     = Bool
     | Int
     | Function Type Type
-    | Variable Int
+    | Variable Identifier
     deriving (Show, Eq)
 
 pretty :: Type -> Text
@@ -26,5 +27,5 @@ pretty type_ =
         Function arg ret ->
             pretty arg <> " -> " <> pretty ret
 
-        Variable id_ ->
-            "t" <> T.pack (show id_)
+        Variable identifier ->
+            Identifier.name identifier
