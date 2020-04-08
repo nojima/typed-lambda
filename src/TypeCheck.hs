@@ -12,7 +12,6 @@ import qualified Data.Text as T
 import qualified Data.Map.Strict as Map
 import qualified Control.Monad.State.Strict as State
 import qualified Control.Monad.Except as Except
-import Debug.Trace
 
 newtype TypeError = TypeError Text
 
@@ -31,7 +30,6 @@ unify type1 type2 =
     if type1 == type2 then
         return ()
     else
-      trace (show (Type.pretty type1, Type.pretty type2)) $
         case (type1, type2) of
             (Type.Variable v1, _) | doesNotOccur v1 type2 -> do
                 updateEnv $ substituteEnv v1 type2
@@ -73,12 +71,6 @@ updateEnv f = do
     state <- State.get
     let newEnv = f (stateEnv state)
     State.put $ state { stateEnv = newEnv }
-
-showEnv :: Environment -> Text
-showEnv env =
-    (T.pack . show)
-        (Map.mapKeys (T.unpack . Identifier.name)
-            (Map.map (T.unpack . Type.pretty) env))
 
 withNestedEnv :: Identifier -> Type -> TypeChecker a -> TypeChecker a
 withNestedEnv name type_ action = do
@@ -240,36 +232,31 @@ typeOfLet _ name expr body = do
     withNestedEnv name type_ (typeOf body)
 
 typeOf :: Term -> TypeChecker Type
-typeOf term = do
-    r <-
-        case term of
-            Term.Bool _ _ ->
-                return Type.Bool
+typeOf term =
+    case term of
+        Term.Bool _ _ ->
+            return Type.Bool
 
-            Term.Int _ _ ->
-                return Type.Int
+        Term.Int _ _ ->
+            return Type.Int
 
-            Term.If pos condTerm thenTerm elseTerm ->
-                typeOfIf pos condTerm thenTerm elseTerm
+        Term.If pos condTerm thenTerm elseTerm ->
+            typeOfIf pos condTerm thenTerm elseTerm
 
-            Term.Variable pos identifier ->
-                typeOfVariable pos identifier
+        Term.Variable pos identifier ->
+            typeOfVariable pos identifier
 
-            Term.Lambda pos argumentName body ->
-                typeOfLambda pos argumentName body
+        Term.Lambda pos argumentName body ->
+            typeOfLambda pos argumentName body
 
-            Term.Apply pos function argument ->
-                typeOfApply pos function argument
+        Term.Apply pos function argument ->
+            typeOfApply pos function argument
 
-            Term.BinOp pos operator lhs rhs ->
-                typeOfBinOp pos operator lhs rhs
+        Term.BinOp pos operator lhs rhs ->
+            typeOfBinOp pos operator lhs rhs
 
-            Term.Let pos name expr body ->
-                typeOfLet pos name expr body
-
-    env <- getEnv
-    trace (T.unpack $ "Term: " <> Term.pretty 1 term <> "\nType: " <> Type.pretty r <> "\nEnv: " <> showEnv env <> "\n")
-        (return r)
+        Term.Let pos name expr body ->
+            typeOfLet pos name expr body
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =
