@@ -162,16 +162,15 @@ typeOfLambda :: SourcePos -> Identifier -> Term -> TypeChecker Type
 typeOfLambda _ argumentName body = do
     argumentType <- Type.Variable <$> newSymbol
     bodyType <- withNestedEnv argumentName argumentType (typeOf body)
-    let functionType_ = Type.Function argumentType bodyType
-    substituteTypeByEnv <$> getEnv <*> pure functionType_
+    let functionType = Type.Function argumentType bodyType
+    substituteTypeByEnv <$> getEnv <*> pure functionType
 
 typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
 typeOfApply pos function argument = do
     argumentType <- typeOf argument
     functionType <- typeOf function
 
-    symbol <- newSymbol
-    let retType = Type.Variable symbol
+    retType <- Type.Variable <$> newSymbol
     unify (Type.Function argumentType retType) functionType
 
     substituteTypeByEnv <$> getEnv <*> pure retType
