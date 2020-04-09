@@ -173,9 +173,9 @@ expr_ =
         , [ binaryOperator Expr.InfixL "+" Term.Add
           , binaryOperator Expr.InfixL "-" Term.Sub
           ]
+        , [ binaryOperator Expr.InfixN "==" Term.Equal ]
         , [ binaryOperator Expr.InfixL "&&" Term.And ]
         , [ binaryOperator Expr.InfixL "||" Term.Or ]
-        , [ binaryOperator Expr.InfixN "==" Term.Equal ]
         ]
         <?> "expression"
     where
