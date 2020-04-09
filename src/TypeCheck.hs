@@ -153,11 +153,75 @@ typeOf env term =
             (bodyType, bodyConstraint, bodyVars) <- typeOf bodyEnv body
             return (bodyType, exprConstraint <> bodyConstraint, exprVars <> bodyVars)
 
+-- 型代入
+type Substitution = [(Type.Variable, Type)]
+
+-- 型制約を充足するような最も一般的な型代入を返す。
+unify :: Constraint -> Either TypeError Substitution
+unify constraint =
+    unify' (Set.toList constraint)
+  where
+    unify' :: [(Type, Type)] -> Either TypeError Substitution
+    unify' [] =
+        return []
+    unify' ((type1, type2):cs) =
+        if type1 == type2 then
+            return []
+        else
+            case (type1, type2) of
+                (Type.Var var1, _) ->
+                    (:) <$> pure (var1, type2) <*> unify' (substituteConstraint var1 type2 cs)
+
+                (_, Type.Var var2) ->
+                    (:) <$> pure (var2, type1) <*> unify' (substituteConstraint var2 type1 cs)
+
+                (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
+                    unify' ((arg1, arg2) : (ret1, ret2) : cs)
+
+                _ ->
+                    Left $ TypeError "failed to unify"
+
+
+substituteConstraint :: Type.Variable -> Type -> [(Type, Type)] -> [(Type, Type)]
+substituteConstraint var type_ =
+    map $ \(lhs, rhs) ->
+        (substituteType var type_ lhs, substituteType var type_ rhs)
+
+substituteType :: Type.Variable -> Type -> Type -> Type
+substituteType var type_ target =
+    case target of
+        Type.Function arg ret ->
+            Type.Function (substituteType var type_ arg) (substituteType var type_ ret)
+        Type.Var v | v == var ->
+            type_
+        _ ->
+            target
+
+applySubstitution :: Substitution -> Type -> Type
+applySubstitution sub type_ =
+    apply (Map.fromList sub) type_
+  where
+    apply :: Map.Map Type.Variable Type -> Type -> Type
+    apply sub type_ =
+        case type_ of
+            Type.Function arg ret ->
+                Type.Function (apply sub arg) (apply sub ret)
+            Type.Var v ->
+                case Map.lookup v sub of
+                    Just t ->
+                        t
+                    Nothing ->
+                        type_
+            _ ->
+                type_
+
 typeCheck :: Term -> Either TypeError Type
-typeCheck term =
-    undefined
-    {-
-    State.evalState
-        (Except.runExceptT (typeOf Map.empty term))
-        TypingState { stateNextId = 1 }
-    -}
+typeCheck term = do
+    (type_, constraints, _) <-
+        State.evalState
+            (Except.runExceptT (typeOf Map.empty term))
+            TypingState { stateNextId = 0 }
+
+    sub <- unify constraints
+
+    return $ applySubstitution sub type_

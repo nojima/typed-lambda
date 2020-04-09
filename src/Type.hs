@@ -28,7 +28,7 @@ pretty type_ =
             "Int"
 
         Function arg ret ->
-            pretty arg <> " -> " <> pretty ret
+            "(" <> pretty arg <> " -> " <> pretty ret <> ")"
 
         Var identifier ->
             Identifier.name identifier
