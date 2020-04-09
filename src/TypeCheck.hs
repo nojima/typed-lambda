@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TypeCheck (typeCheck, TypeError(..)) where
 
-import           Term (Term, Operator)
+import           Term (Term, Operator, SourcePos)
 import qualified Term
 import           Type (Type)
 import qualified Type
@@ -27,7 +27,10 @@ type Env = Map.Map Identifier Type
 
 -- 型制約
 -- 等式 S = T の集合。ただし S と T は型。
-type Constraint = [(Type, Type)]
+type Constraints = [Constraint]
+
+data Constraint =
+    CEqual Type Type SourcePos
 
 -- 型変数の集合
 type Variables = Set.Set Type.Variable
@@ -40,59 +43,59 @@ newVariable = do
     State.put $ state { stateNextId = nextId + 1 }
     return var
 
-mustBe :: Type -> Env -> Term -> TypeChecker (Constraint, Variables)
-mustBe type_ env term = do
-    (actualType, constraint, vars) <- typeOf env term
-    return ((actualType, type_) : constraint, vars)
+mustBe :: Type -> SourcePos -> Env -> Term -> TypeChecker (Constraints, Variables)
+mustBe type_ pos env term = do
+    (actualType, constraints, vars) <- typeOf env term
+    return (CEqual actualType type_ pos : constraints, vars)
 
-mustBeInt :: Env -> Term -> TypeChecker (Constraint, Variables)
+mustBeInt :: SourcePos -> Env -> Term -> TypeChecker (Constraints, Variables)
 mustBeInt = mustBe Type.Int
 
-mustBeBool :: Env -> Term -> TypeChecker (Constraint, Variables)
+mustBeBool :: SourcePos -> Env -> Term -> TypeChecker (Constraints, Variables)
 mustBeBool = mustBe Type.Bool
 
-typeOfBinOp :: Env -> Operator -> Term -> Term -> TypeChecker (Type, Constraint, Variables)
-typeOfBinOp env operator lhs rhs =
+typeOfBinOp :: SourcePos -> Env -> Operator -> Term -> Term -> TypeChecker (Type, Constraints, Variables)
+typeOfBinOp pos env operator lhs rhs =
     case operator of
         Term.Add -> do
-            (lhsConstraint, lhsVars) <- mustBeInt env lhs
-            (rhsConstraint, rhsVars) <- mustBeInt env rhs
-            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeInt pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeInt pos env rhs
+            return (Type.Int, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.Sub -> do
-            (lhsConstraint, lhsVars) <- mustBeInt env lhs
-            (rhsConstraint, rhsVars) <- mustBeInt env rhs
-            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeInt pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeInt pos env rhs
+            return (Type.Int, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.Mul -> do
-            (lhsConstraint, lhsVars) <- mustBeInt env lhs
-            (rhsConstraint, rhsVars) <- mustBeInt env rhs
-            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeInt pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeInt pos env rhs
+            return (Type.Int, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.Div -> do
-            (lhsConstraint, lhsVars) <- mustBeInt env lhs
-            (rhsConstraint, rhsVars) <- mustBeInt env rhs
-            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeInt pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeInt pos env rhs
+            return (Type.Int, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.And -> do
-            (lhsConstraint, lhsVars) <- mustBeBool env lhs
-            (rhsConstraint, rhsVars) <- mustBeBool env rhs
-            return (Type.Bool, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeBool pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeBool pos env rhs
+            return (Type.Bool, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.Or -> do
-            (lhsConstraint, lhsVars) <- mustBeBool env lhs
-            (rhsConstraint, rhsVars) <- mustBeBool env rhs
-            return (Type.Bool, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
+            (lhsConstraints, lhsVars) <- mustBeBool pos env lhs
+            (rhsConstraints, rhsVars) <- mustBeBool pos env rhs
+            return (Type.Bool, lhsConstraints <> rhsConstraints, lhsVars <> rhsVars)
 
         Term.Equal -> do
-            (lhsType, lhsConstraint, lhsVars) <- typeOf env lhs
-            (rhsType, rhsConstraint, rhsVars) <- typeOf env rhs
+            (lhsType, lhsConstraints, lhsVars) <- typeOf env lhs
+            (rhsType, rhsConstraints, rhsVars) <- typeOf env rhs
             return ( Type.Bool
-                   , (lhsType, rhsType) : lhsConstraint <> rhsConstraint
+                   , CEqual lhsType rhsType pos : lhsConstraints <> rhsConstraints
                    , lhsVars <> rhsVars
                    )
 
-typeOf :: Env -> Term -> TypeChecker (Type, Constraint, Variables)
+typeOf :: Env -> Term -> TypeChecker (Type, Constraints, Variables)
 typeOf env term =
     case term of
         Term.Bool _ _ ->
@@ -102,15 +105,15 @@ typeOf env term =
             return (Type.Int, [], Set.empty)
 
         Term.If pos condTerm thenTerm elseTerm -> do
-            (condType, condConstraint, condVars) <- typeOf env condTerm
-            (thenType, thenConstraint, thenVars) <- typeOf env thenTerm
-            (elseType, elseConstraint, elseVars) <- typeOf env elseTerm
-            let constraint =
-                    (condType, Type.Bool) :
-                        (thenType, elseType) :
-                            condConstraint <> thenConstraint <> elseConstraint
+            (condType, condConstraints, condVars) <- typeOf env condTerm
+            (thenType, thenConstraints, thenVars) <- typeOf env thenTerm
+            (elseType, elseConstraints, elseVars) <- typeOf env elseTerm
+            let constraints =
+                    CEqual condType Type.Bool pos :
+                    CEqual thenType elseType pos :
+                    condConstraints <> thenConstraints <> elseConstraints
             let variables = condVars <> thenVars <> elseVars
-            return (thenType, constraint, variables)
+            return (thenType, constraints, variables)
 
         Term.Variable pos identifier ->
             case Map.lookup identifier env of
@@ -123,73 +126,74 @@ typeOf env term =
                         <> Identifier.name identifier
                         <> "` not found"
 
-        Term.Lambda pos argName body -> do
+        Term.Lambda _ argName body -> do
             var <- newVariable
             let argType = Type.Var var
             let bodyEnv = Map.insert argName argType env
-            (bodyType, bodyConstraint, bodyVars) <- typeOf bodyEnv body
+            (bodyType, bodyConstraints, bodyVars) <- typeOf bodyEnv body
             return ( Type.Function argType bodyType
-                   , bodyConstraint
+                   , bodyConstraints
                    , Set.insert var bodyVars
                    )
 
         Term.Apply pos fun arg -> do
-            (funType, funConstraint, funVars) <- typeOf env fun
-            (argType, argConstraint, argVars) <- typeOf env arg
+            (funType, funConstraints, funVars) <- typeOf env fun
+            (argType, argConstraints, argVars) <- typeOf env arg
             var <- newVariable
             let retType = Type.Var var
-            let constraint =
-                    (funType, Type.Function argType retType) :
-                        funConstraint <> argConstraint
+            let constraints =
+                    CEqual funType (Type.Function argType retType) pos :
+                    funConstraints <> argConstraints
             let variables = Set.insert var (funVars <> argVars)
-            return (retType, constraint, variables)
+            return (retType, constraints, variables)
 
         Term.BinOp pos operator lhs rhs ->
-            typeOfBinOp env operator lhs rhs
+            typeOfBinOp pos env operator lhs rhs
 
-        Term.Let pos name expr body -> do
-            (exprType, exprConstraint, exprVars) <- typeOf env expr
+        Term.Let _ name expr body -> do
+            (exprType, exprConstraints, exprVars) <- typeOf env expr
             let bodyEnv = Map.insert name exprType env
-            (bodyType, bodyConstraint, bodyVars) <- typeOf bodyEnv body
-            return (bodyType, exprConstraint <> bodyConstraint, exprVars <> bodyVars)
+            (bodyType, bodyConstraints, bodyVars) <- typeOf bodyEnv body
+            return (bodyType, exprConstraints <> bodyConstraints, exprVars <> bodyVars)
 
 -- 型代入
 type Substitution = [(Type.Variable, Type)]
 
 -- 型制約を充足するような最も一般的な型代入を返す。
-unify :: Constraint -> Either TypeError Substitution
+unify :: Constraints -> Either TypeError Substitution
 unify [] = return []
-unify ((type1, type2):cs) =
+unify (CEqual type1 type2 pos : cs) =
     if type1 == type2 then
         unify cs
     else
         case (type1, type2) of
             (Type.Var var1, _) ->
-                (:) <$> pure (var1, type2) <*> unify (substituteConstraint var1 type2 cs)
+                (:) <$> pure (var1, type2) <*> unify (substituteConstraints var1 type2 cs)
 
             (_, Type.Var var2) ->
-                (:) <$> pure (var2, type1) <*> unify (substituteConstraint var2 type1 cs)
+                (:) <$> pure (var2, type1) <*> unify (substituteConstraints var2 type1 cs)
 
             (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
-                unify ((arg1, arg2) : (ret1, ret2) : cs)
+                unify (CEqual arg1 arg2 pos : CEqual ret1 ret2 pos : cs)
 
             _ ->
                 let
                     errorMessage =
-                        "Type mismatch\n"
-                        <> "  Expected: "
+                        T.pack (Term.sourcePosPretty pos)
+                        <> ": type mismatch\n"
+                        <> "  expected: "
                         <> Type.pretty type2
                         <> "\n"
-                        <> "  Actual: "
+                        <> "  actual: "
                         <> Type.pretty type1
                         <> "\n"
                 in
                 Left $ TypeError errorMessage
 
-substituteConstraint :: Type.Variable -> Type -> [(Type, Type)] -> [(Type, Type)]
-substituteConstraint var type_ =
-    map $ \(lhs, rhs) ->
-        (substituteType var type_ lhs, substituteType var type_ rhs)
+substituteConstraints :: Type.Variable -> Type -> Constraints -> Constraints
+substituteConstraints var type_ =
+    map $ \(CEqual lhs rhs pos) ->
+        CEqual (substituteType var type_ lhs) (substituteType var type_ rhs) pos
 
 substituteType :: Type.Variable -> Type -> Type -> Type
 substituteType var type_ target =
@@ -221,11 +225,11 @@ applySubstitution sub type_ =
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term = do
-    (type_, constraints, _) <-
+    (type_, constraintss, _) <-
         State.evalState
             (Except.runExceptT (typeOf Map.empty term))
             TypingState { stateNextId = 0 }
 
-    sub <- unify constraints
+    sub <- unify constraintss
 
     return $ applySubstitution sub type_
