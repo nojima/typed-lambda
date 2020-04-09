@@ -7,257 +7,157 @@ import           Type (Type)
 import qualified Type
 import           Identifier (Identifier)
 import qualified Identifier
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Control.Monad.State.Strict as State
 import qualified Control.Monad.Except as Except
 
-newtype TypeError = TypeError Text
-
-type Environment = Map.Map Identifier Type
+newtype TypeError = TypeError T.Text
 
 data TypingState = TypingState
-    { stateNextId :: !Int
-    , stateEnv :: Environment
-    }
-    deriving (Show, Eq)
+    { stateNextId :: !Int }
+    deriving (Eq, Show)
 
 type TypeChecker a = Except.ExceptT TypeError (State.State TypingState) a
 
-unify :: Type -> Type -> TypeChecker ()
-unify type1 type2 =
-    if type1 == type2 then
-        return ()
-    else
-        case (type1, type2) of
-            (Type.Variable v1, _) | doesNotOccur v1 type2 -> do
-                updateEnv $ substituteEnv v1 type2
-                updateEnv $ Map.insert v1 type2
-            (_, Type.Variable v2) | doesNotOccur v2 type1 -> do
-                updateEnv $ substituteEnv v2 type1
-                updateEnv $ Map.insert v2 type1
-            (Type.Function arg1 ret1, Type.Function arg2 ret2) -> do
-                unify arg1 arg2
-                ret1' <- substituteTypeByEnv <$> getEnv <*> pure ret1
-                ret2' <- substituteTypeByEnv <$> getEnv <*> pure ret2
-                unify ret1' ret2'
-            _ ->
-                let
-                    errorMessage =
-                        "unification failed: "
-                        <> "type1 = "
-                        <> Type.pretty type1
-                        <> ", type2 = "
-                        <> Type.pretty type2
-                in
-                Except.throwError $ TypeError errorMessage
+-- 型環境
+-- 変数名からその型へのマップ。
+type Env = Map.Map Identifier Type
 
-doesNotOccur :: Identifier -> Type -> Bool
-doesNotOccur identifier type_ =
-    case type_ of
-        Type.Function arg ret ->
-            doesNotOccur identifier arg || doesNotOccur identifier ret
-        Type.Variable identifier_ ->
-            identifier /= identifier_
-        _ -> True
+-- 型制約
+-- 等式 S = T の集合。ただし S と T は型。
+type Constraint = Set.Set (Type, Type)
 
-getEnv :: TypeChecker Environment
-getEnv =
-    stateEnv <$> State.get
+-- 型変数の集合
+type Variables = Set.Set Type.Variable
 
-updateEnv :: (Environment -> Environment) -> TypeChecker ()
-updateEnv f = do
-    state <- State.get
-    let newEnv = f (stateEnv state)
-    State.put $ state { stateEnv = newEnv }
-
-withNestedEnv :: Identifier -> Type -> TypeChecker a -> TypeChecker a
-withNestedEnv name type_ action = do
-    -- Keep old type before update
-    old <- Map.lookup name <$> getEnv
-
-    -- Update env, and then call the action
-    updateEnv $ Map.insert name type_
-    result <- action
-
-    -- Restore env
-    updateEnv $ Map.update (const old) name
-
-    return result
-
-substituteTypeByEnv :: Environment -> Type -> Type
-substituteTypeByEnv env type_ =
-    case type_ of
-        Type.Bool ->
-            type_
-        Type.Int ->
-            type_
-        Type.Function arg ret ->
-            Type.Function (substituteTypeByEnv env arg) (substituteTypeByEnv env ret)
-        Type.Variable identifier ->
-            case Map.lookup identifier env of
-                Nothing ->
-                    type_
-                Just t ->
-                    substituteTypeByEnv env t
-
-substituteType :: Identifier -> Type -> Type -> Type
-substituteType identifier type_ target =
-    case target of
-        Type.Function arg ret ->
-            Type.Function
-                (substituteType identifier type_ arg)
-                (substituteType identifier type_ ret)
-        Type.Variable identifier_ | identifier_ == identifier ->
-            type_
-        _ ->
-            target
-
-substituteEnv :: Identifier -> Type -> Environment -> Environment
-substituteEnv identifier type_ =
-    Map.map (substituteType identifier type_)
-
-newSymbol :: TypeChecker Identifier
-newSymbol = do
+newVariable :: TypeChecker Type.Variable
+newVariable = do
     state <- State.get
     let nextId = stateNextId state
-    let identifier = Identifier.Identifier $ T.pack $ 't' : show nextId
+    let var = Identifier.fromText $ T.pack $ 't' : show nextId
     State.put $ state { stateNextId = nextId + 1 }
-    return identifier
+    return var
 
-lookupVariable :: Identifier -> TypeChecker (Maybe Type)
-lookupVariable identifier =
-    Map.lookup identifier <$> getEnv
+mustBe :: Type -> Env -> Term -> TypeChecker (Constraint, Variables)
+mustBe type_ env term = do
+    (actualType, constraint, vars) <- typeOf env term
+    return (Set.insert (actualType, type_) constraint, vars)
 
-typeOfVariable :: SourcePos -> Identifier -> TypeChecker Type
-typeOfVariable pos identifier = do
-    maybeType <- lookupVariable identifier
-    case maybeType of
-        Nothing ->
-            let
-                errorMessage =
-                    T.pack (Term.sourcePosPretty pos)
-                    <> ": undefined variable '"
-                    <> Identifier.name identifier
-                    <> "'"
-            in
-            Except.throwError $ TypeError errorMessage
+mustBeInt :: Env -> Term -> TypeChecker (Constraint, Variables)
+mustBeInt = mustBe Type.Int
 
-        Just type_ ->
-            return type_
+mustBeBool :: Env -> Term -> TypeChecker (Constraint, Variables)
+mustBeBool = mustBe Type.Bool
 
-typeOfIf :: SourcePos -> Term -> Term -> Term -> TypeChecker Type
-typeOfIf _ condTerm thenTerm elseTerm = do
-    condType <- typeOf condTerm
-    unify Type.Bool condType
-
-    thenType <- typeOf thenTerm
-    elseType <- typeOf elseTerm
-    unify thenType elseType
-
-    substituteTypeByEnv <$> getEnv <*> pure thenType
-
-typeOfLambda :: SourcePos -> Identifier -> Term -> TypeChecker Type
-typeOfLambda _ argumentName body = do
-    argumentType <- Type.Variable <$> newSymbol
-    bodyType <- withNestedEnv argumentName argumentType (typeOf body)
-    let functionType = Type.Function argumentType bodyType
-    substituteTypeByEnv <$> getEnv <*> pure functionType
-
-typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
-typeOfApply pos function argument = do
-    argumentType <- typeOf argument
-    functionType <- typeOf function
-
-    retType <- Type.Variable <$> newSymbol
-    unify (Type.Function argumentType retType) functionType
-
-    substituteTypeByEnv <$> getEnv <*> pure retType
-
-mustBeInt :: SourcePos -> Text -> Term -> TypeChecker ()
-mustBeInt pos hint term = do
-    type_ <- typeOf term
-    unify Type.Int type_
-
-mustBeBool :: SourcePos -> Text -> Term -> TypeChecker ()
-mustBeBool pos hint term = do
-    type_ <- typeOf term
-    unify Type.Bool type_
-
-typeOfBinOp :: SourcePos -> Operator -> Term -> Term -> TypeChecker Type
-typeOfBinOp pos operator lhs rhs =
+typeOfBinOp :: Env -> Operator -> Term -> Term -> TypeChecker (Type, Constraint, Variables)
+typeOfBinOp env operator lhs rhs =
     case operator of
         Term.Add -> do
-            mustBeInt pos "the 1st argument of `+` operator" lhs
-            mustBeInt pos "the 2nd argument of `+` operator" rhs
-            return Type.Int
+            (lhsConstraint, lhsVars) <- mustBeInt env lhs
+            (rhsConstraint, rhsVars) <- mustBeInt env rhs
+            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.Sub -> do
-            mustBeInt pos "the 1st argument of `-` operator" lhs
-            mustBeInt pos "the 2nd argument of `-` operator" rhs
-            return Type.Int
+            (lhsConstraint, lhsVars) <- mustBeInt env lhs
+            (rhsConstraint, rhsVars) <- mustBeInt env rhs
+            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.Mul -> do
-            mustBeInt pos "the 1st argument of `*` operator" lhs
-            mustBeInt pos "the 2nd argument of `*` operator" rhs
-            return Type.Int
+            (lhsConstraint, lhsVars) <- mustBeInt env lhs
+            (rhsConstraint, rhsVars) <- mustBeInt env rhs
+            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.Div -> do
-            mustBeInt pos "the 1st argument of `/` operator" lhs
-            mustBeInt pos "the 2nd argument of `/` operator" rhs
-            return Type.Int
+            (lhsConstraint, lhsVars) <- mustBeInt env lhs
+            (rhsConstraint, rhsVars) <- mustBeInt env rhs
+            return (Type.Int, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.And -> do
-            mustBeBool pos "the 1st argument of `&&` operator" lhs
-            mustBeBool pos "the 2nd argument of `&&` operator" rhs
-            return Type.Bool
+            (lhsConstraint, lhsVars) <- mustBeBool env lhs
+            (rhsConstraint, rhsVars) <- mustBeBool env rhs
+            return (Type.Bool, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.Or -> do
-            mustBeBool pos "the 1st argument of `||` operator" lhs
-            mustBeBool pos "the 2nd argument of `||` operator" rhs
-            return Type.Bool
+            (lhsConstraint, lhsVars) <- mustBeBool env lhs
+            (rhsConstraint, rhsVars) <- mustBeBool env rhs
+            return (Type.Bool, lhsConstraint <> rhsConstraint, lhsVars <> rhsVars)
 
         Term.Equal -> do
-            lhsType <- typeOf lhs
-            rhsType <- typeOf rhs
-            unify lhsType rhsType
-            return Type.Bool
+            (lhsType, lhsConstraint, lhsVars) <- typeOf env lhs
+            (rhsType, rhsConstraint, rhsVars) <- typeOf env rhs
+            return ( Type.Bool
+                   , Set.insert (lhsType, rhsType) (lhsConstraint <> rhsConstraint)
+                   , lhsVars <> rhsVars
+                   )
 
-typeOfLet :: SourcePos -> Identifier -> Term -> Term -> TypeChecker Type
-typeOfLet _ name expr body = do
-    type_ <- typeOf expr
-    withNestedEnv name type_ (typeOf body)
-
-typeOf :: Term -> TypeChecker Type
-typeOf term =
+typeOf :: Env -> Term -> TypeChecker (Type, Constraint, Variables)
+typeOf env term =
     case term of
         Term.Bool _ _ ->
-            return Type.Bool
+            return (Type.Bool, Set.empty, Set.empty)
 
         Term.Int _ _ ->
-            return Type.Int
+            return (Type.Int, Set.empty, Set.empty)
 
-        Term.If pos condTerm thenTerm elseTerm ->
-            typeOfIf pos condTerm thenTerm elseTerm
+        Term.If pos condTerm thenTerm elseTerm -> do
+            (condType, condConstraint, condVars) <- typeOf env condTerm
+            (thenType, thenConstraint, thenVars) <- typeOf env thenTerm
+            (elseType, elseConstraint, elseVars) <- typeOf env elseTerm
+            let constraint =
+                    Set.insert (condType, Type.Bool) $
+                        Set.insert (thenType, elseType) $
+                            condConstraint <> thenConstraint <> elseConstraint
+            let variables = condVars <> thenVars <> elseVars
+            return (thenType, constraint, variables)
 
         Term.Variable pos identifier ->
-            typeOfVariable pos identifier
+            case Map.lookup identifier env of
+                Just type_ ->
+                    return (type_, Set.empty, Set.empty)
+                Nothing ->
+                    Except.throwError $ TypeError $
+                        T.pack (Term.sourcePosPretty pos)
+                        <> ": variable `"
+                        <> Identifier.name identifier
+                        <> "` not found"
 
-        Term.Lambda pos argumentName body ->
-            typeOfLambda pos argumentName body
+        Term.Lambda pos argName body -> do
+            var <- newVariable
+            let argType = Type.Var var
+            let bodyEnv = Map.insert argName argType env
+            (bodyType, bodyConstraint, bodyVars) <- typeOf bodyEnv body
+            return ( Type.Function argType bodyType
+                   , bodyConstraint
+                   , Set.insert var bodyVars
+                   )
 
-        Term.Apply pos function argument ->
-            typeOfApply pos function argument
+        Term.Apply pos fun arg -> do
+            (funType, funConstraint, funVars) <- typeOf env fun
+            (argType, argConstraint, argVars) <- typeOf env arg
+            var <- newVariable
+            let retType = Type.Var var
+            let constraint =
+                    Set.insert (funType, Type.Function argType retType) $
+                        funConstraint <> argConstraint
+            let variables = Set.insert var (funVars <> argVars)
+            return (retType, constraint, variables)
 
         Term.BinOp pos operator lhs rhs ->
-            typeOfBinOp pos operator lhs rhs
+            typeOfBinOp env operator lhs rhs
 
-        Term.Let pos name expr body ->
-            typeOfLet pos name expr body
+        Term.Let pos name expr body -> do
+            (exprType, exprConstraint, exprVars) <- typeOf env expr
+            let bodyEnv = Map.insert name exprType env
+            (bodyType, bodyConstraint, bodyVars) <- typeOf bodyEnv body
+            return (bodyType, exprConstraint <> bodyConstraint, exprVars <> bodyVars)
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term =
+    undefined
+    {-
     State.evalState
-        (Except.runExceptT (typeOf term))
-        TypingState { stateNextId = 1, stateEnv = Map.empty }
+        (Except.runExceptT (typeOf Map.empty term))
+        TypingState { stateNextId = 1 }
+    -}

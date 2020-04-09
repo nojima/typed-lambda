@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Type
     ( Type(..)
+    , Variable
     , pretty
     ) where
 
@@ -12,8 +13,10 @@ data Type
     = Bool
     | Int
     | Function Type Type
-    | Variable Identifier
-    deriving (Show, Eq)
+    | Var Variable
+    deriving (Show, Eq, Ord)
+
+type Variable = Identifier
 
 pretty :: Type -> Text
 pretty type_ =
@@ -27,5 +30,5 @@ pretty type_ =
         Function arg ret ->
             pretty arg <> " -> " <> pretty ret
 
-        Variable identifier ->
+        Var identifier ->
             Identifier.name identifier
