@@ -5,8 +5,6 @@ import           Term (Term)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
-import           Type (Type)
-import qualified Type
 import qualified Data.Char as Char
 import           Data.Text (Text)
 import qualified Data.Text as T

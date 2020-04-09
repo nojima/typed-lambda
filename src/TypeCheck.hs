@@ -190,6 +190,7 @@ unify (CEqual type1 type2 pos : cs) =
                 in
                 Left $ TypeError errorMessage
 
+
 substituteConstraints :: Type.Variable -> Type -> Constraints -> Constraints
 substituteConstraints var type_ =
     map $ \(CEqual lhs rhs pos) ->
@@ -206,18 +207,18 @@ substituteType var type_ target =
             target
 
 applySubstitution :: Substitution -> Type -> Type
-applySubstitution sub type_ =
-    apply (Map.fromList sub) type_
+applySubstitution sub =
+    apply (Map.fromList sub)
   where
     apply :: Map.Map Type.Variable Type -> Type -> Type
-    apply sub type_ =
+    apply sub_ type_ =
         case type_ of
             Type.Function arg ret ->
-                Type.Function (apply sub arg) (apply sub ret)
+                Type.Function (apply sub_ arg) (apply sub_ ret)
             Type.Var v ->
-                case Map.lookup v sub of
+                case Map.lookup v sub_ of
                     Just t ->
-                        apply sub t
+                        apply sub_ t
                     Nothing ->
                         type_
             _ ->

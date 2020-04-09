@@ -11,8 +11,6 @@ module Term
 
 import           Identifier (Identifier)
 import qualified Identifier
-import           Type (Type)
-import qualified Type
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)

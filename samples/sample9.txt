@@ -1,0 +1,5 @@
+-- let多相
+let id = lambda x. x in
+let a = id 10 in
+let b = id false in
+if b then a else a+1
