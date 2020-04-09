@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TypeCheck (typeCheck, TypeError(..)) where
 
-import           Term (Term, Operator, SourcePos)
+import           Term (Term, Operator)
 import qualified Term
 import           Type (Type)
 import qualified Type
@@ -166,7 +166,7 @@ unify constraint =
         return []
     unify' ((type1, type2):cs) =
         if type1 == type2 then
-            return []
+            unify' cs
         else
             case (type1, type2) of
                 (Type.Var var1, _) ->
@@ -209,7 +209,7 @@ applySubstitution sub type_ =
             Type.Var v ->
                 case Map.lookup v sub of
                     Just t ->
-                        t
+                        apply sub t
                     Nothing ->
                         type_
             _ ->

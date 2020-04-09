@@ -1,0 +1,2 @@
+lambda x. lambda y. x y false
+-- lambda x. x false
