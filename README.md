@@ -33,18 +33,18 @@ false
 ### ラムダ式
 
 ラムダ式は以下のような構文です。
-引数は必ず一つで、型を必ず明記しなければいけません。
+引数は必ず一つだけです。
 
 ```
 -- identity function
-lambda x:Int . x
+lambda x. x
 ```
 
 引数を複数個取るような関数が欲しいときはラムダをネストさせてください。
 
 ```
-lambda f:Int -> Int .
-    lambda n:Int .
+lambda f.
+    lambda n.
         f n
 ```
 
@@ -53,9 +53,8 @@ lambda f:Int -> Int .
 項を並べれば関数適用になります。関数適用は左結合です。
 
 ```
-(lambda x:Int . x * x) 100
+(lambda x. x * x) 100
 ```
-
 
 ### if式
 
@@ -76,10 +75,31 @@ let x = 10 in x * x
 ラムダを束縛すると名前付き関数の宣言として使えます。
 
 ```
-let f = lambda x:Int .
+let f = lambda x.
     x * x
 in
 f 100
+```
+
+let多相も実装されています。
+
+```
+let identity = lambda x. x in
+let n = identity 100 in
+let b = identity true in
+if b then n else n+1
+```
+
+let多相はその名の通りletで束縛したときに起こります。
+以下のように `identity` を lambda の引数として渡すと `identity` は単相な型として型付けされるので、TypeError になります。
+
+```
+(lambda identity.
+    let n = identity 100 in
+    let n = identity 100 in
+    let b = identity true in
+    if b then n else n+1
+) (lambda x. x)
 ```
 
 ### 二項演算子
@@ -91,8 +111,11 @@ f 100
 | `*` | 掛け算 | `Int -> Int -> Int` | 左
 | `/` | 割り算(小数点以下切り捨て) | `Int -> Int -> Int` | 左
 | `&&` | 論理積 | `Bool -> Bool -> Bool` | 左
-| `||` | 論理和 | `Bool -> Bool -> Bool` | 左
+| `｜｜` | 論理和 | `Bool -> Bool -> Bool` | 左
 | `==` | 等しい | `∀a. a -> a -> Bool` | 無
+
+※ 論理和を全角文字で表記していますが、正しくは半角です。
+表の中に `|` を書くと GitHub の Markdown のパースが狂うので全角で書いています。
 
 ### コメント
 
