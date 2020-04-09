@@ -24,6 +24,7 @@ data Term
     | Apply    SourcePos Term Term
     | BinOp    SourcePos Operator Term Term
     | Let      SourcePos Identifier Term Term
+    | Def      SourcePos Identifier Identifier Term Term
     deriving (Show, Eq)
 
 data Operator
@@ -47,6 +48,7 @@ sourcePos term =
         Apply sp _ _ -> sp
         BinOp sp _ _ _ -> sp
         Let sp _ _ _ -> sp
+        Def sp _ _ _ _ -> sp
 
 mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
 mapSourcePos f term =
@@ -59,6 +61,7 @@ mapSourcePos f term =
         Apply sp fn a -> Apply (f sp) (mapSourcePos f fn) (mapSourcePos f a)
         BinOp sp op t1 t2 -> BinOp (f sp) op (mapSourcePos f t1) (mapSourcePos f t2)
         Let sp vn ve b -> Let (f sp) vn (mapSourcePos f ve) (mapSourcePos f b)
+        Def sp name arg expr b -> Def (f sp) name arg (mapSourcePos f expr) (mapSourcePos f b)
 
 pretty :: Int -> Term -> Text
 pretty indentLevel term =
@@ -113,6 +116,20 @@ pretty indentLevel term =
             "LET "
             <> Identifier.name name
             <> " =\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) expr
+            <> "\n"
+            <> indent indentLevel
+            <> "IN\n"
+            <> indent indentLevel
+            <> pretty (indentLevel + 1) body
+
+        Def _ name arg expr body ->
+            "DEF "
+            <> Identifier.name name
+            <> " "
+            <> Identifier.name arg
+            <> "\n"
             <> indent indentLevel
             <> pretty (indentLevel + 1) expr
             <> "\n"

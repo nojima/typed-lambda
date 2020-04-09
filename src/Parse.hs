@@ -197,10 +197,23 @@ letExpr =
         <*  keyword "in"
         <*> expr
 
+defExpr :: Parser Term
+defExpr =
+    Term.Def
+        <$> Parsec.getSourcePos
+        <*  keyword "def"
+        <*> identifier
+        <*> identifier
+        <*  symbol "="
+        <*> expr
+        <*  keyword "in"
+        <*> expr
+
 expr :: Parser Term
 expr =
     Parsec.choice
         [ letExpr
+        , defExpr
         , expr_
         ]
 

@@ -282,6 +282,26 @@ constrain env term =
             (bodyType, bodyConstraints, bodyVars) <- constrain bodyEnv body
             return (bodyType, exprConstraints <> bodyConstraints, exprVars <> bodyVars)
 
+        Term.Def _ name argName expr body -> do
+            argVar <- newVariable
+            let argType = Type.Var argVar
+
+            retVar <- newVariable
+            let funType = Type.Function argType (Type.Var retVar)
+
+            let exprEnv =
+                    Map.insert argName (ForAll [] argType) $
+                        Map.insert name (ForAll [] funType) env
+
+            (_, exprConstraints, exprVars) <- constrain exprEnv expr
+            sub <- Except.liftEither $ unify exprConstraints
+            let principalType = applySubstitution sub funType
+            let typeScheme = generalize env principalType
+
+            let bodyEnv = Map.insert name typeScheme env
+            (bodyType, bodyConstraints, bodyVars) <- constrain bodyEnv body
+            return (bodyType, exprConstraints <> bodyConstraints, exprVars <> bodyVars)
+
 -------------------------------------------------------------------------------
 
 typeCheck :: Term -> Either TypeError Type

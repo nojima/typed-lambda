@@ -123,6 +123,13 @@ evalLet frame name expr body = do
     let newFrame = Frame name value (Just frame)
     eval newFrame body
 
+evalDef :: Frame -> Identifier -> Identifier -> Term -> Term -> Either RuntimeError Value
+evalDef frame name arg expr body =
+    eval newFrame body
+  where
+    newClosure = Value.Closure newFrame arg expr
+    newFrame = Frame name newClosure (Just frame)
+
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
@@ -149,6 +156,9 @@ eval frame term =
 
         Term.Let _ name expr body ->
             evalLet frame name expr body
+
+        Term.Def _ name arg expr body ->
+            evalDef frame name arg expr body
 
 run :: Term -> Either RuntimeError Value
 run term =
