@@ -39,8 +39,8 @@ unify type1 type2 =
                 updateEnv $ Map.insert v2 type1
             (Type.Function arg1 ret1, Type.Function arg2 ret2) -> do
                 unify arg1 arg2
-                ret1' <- substitute ret1
-                ret2' <- substitute ret2
+                ret1' <- substituteTypeByEnv <$> getEnv <*> pure ret1
+                ret2' <- substituteTypeByEnv <$> getEnv <*> pure ret2
                 unify ret1' ret2'
             _ ->
                 let
@@ -86,22 +86,21 @@ withNestedEnv name type_ action = do
 
     return result
 
-substitute :: Type -> TypeChecker Type
-substitute type_ =
+substituteTypeByEnv :: Environment -> Type -> Type
+substituteTypeByEnv env type_ =
     case type_ of
         Type.Bool ->
-            return type_
+            type_
         Type.Int ->
-            return type_
+            type_
         Type.Function arg ret ->
-            Type.Function <$> substitute arg <*> substitute ret
-        Type.Variable identifier -> do
-            maybeType <- Map.lookup identifier <$> getEnv
-            case maybeType of
+            Type.Function (substituteTypeByEnv env arg) (substituteTypeByEnv env ret)
+        Type.Variable identifier ->
+            case Map.lookup identifier env of
                 Nothing ->
-                    return type_
+                    type_
                 Just t ->
-                    substitute t
+                    substituteTypeByEnv env t
 
 substituteType :: Identifier -> Type -> Type -> Type
 substituteType identifier type_ target =
@@ -157,14 +156,14 @@ typeOfIf _ condTerm thenTerm elseTerm = do
     elseType <- typeOf elseTerm
     unify thenType elseType
 
-    substitute thenType
+    substituteTypeByEnv <$> getEnv <*> pure thenType
 
 typeOfLambda :: SourcePos -> Identifier -> Term -> TypeChecker Type
 typeOfLambda _ argumentName body = do
     argumentType <- Type.Variable <$> newSymbol
     bodyType <- withNestedEnv argumentName argumentType (typeOf body)
     let functionType_ = Type.Function argumentType bodyType
-    substitute functionType_
+    substituteTypeByEnv <$> getEnv <*> pure functionType_
 
 typeOfApply :: SourcePos -> Term -> Term -> TypeChecker Type
 typeOfApply pos function argument = do
@@ -175,7 +174,7 @@ typeOfApply pos function argument = do
     let retType = Type.Variable symbol
     unify (Type.Function argumentType retType) functionType
 
-    substitute retType
+    substituteTypeByEnv <$> getEnv <*> pure retType
 
 mustBeInt :: SourcePos -> Text -> Term -> TypeChecker ()
 mustBeInt pos hint term = do
