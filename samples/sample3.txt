@@ -1,4 +1,4 @@
 (lambda first.
     lambda second.
         first
-) true false
+) 100 false
