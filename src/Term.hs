@@ -73,9 +73,9 @@ pretty indentLevel term =
             T.pack (show nat)
 
         If _ condTerm thenTerm elseTerm ->
-            "(IF ("
+            "(IF "
             <> pretty (indentLevel + 1) condTerm
-            <> ")\n"
+            <> "\n"
             <> indent indentLevel
             <> pretty (indentLevel + 1) thenTerm
             <> "\n"
