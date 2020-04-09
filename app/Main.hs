@@ -7,7 +7,7 @@ import qualified Type
 import           TypeCheck (typeCheck)
 import qualified TypeCheck
 import qualified Eval
-import qualified System.IO as IO  
+import qualified System.IO as IO
 import qualified System.Exit as Exit
 import qualified Data.Text.IO as TIO
 
@@ -40,4 +40,4 @@ main = do
         Right result ->
             return result
 
-    putStrLn $ "=> " ++ show value
+    putStrLn $ "=> " <> show value

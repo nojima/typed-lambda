@@ -27,7 +27,7 @@ type Env = Map.Map Identifier Type
 
 -- 型制約
 -- 等式 S = T の集合。ただし S と T は型。
-type Constraint = Set.Set (Type, Type)
+type Constraint = [(Type, Type)]
 
 -- 型変数の集合
 type Variables = Set.Set Type.Variable
@@ -43,7 +43,7 @@ newVariable = do
 mustBe :: Type -> Env -> Term -> TypeChecker (Constraint, Variables)
 mustBe type_ env term = do
     (actualType, constraint, vars) <- typeOf env term
-    return (Set.insert (actualType, type_) constraint, vars)
+    return ((actualType, type_) : constraint, vars)
 
 mustBeInt :: Env -> Term -> TypeChecker (Constraint, Variables)
 mustBeInt = mustBe Type.Int
@@ -88,7 +88,7 @@ typeOfBinOp env operator lhs rhs =
             (lhsType, lhsConstraint, lhsVars) <- typeOf env lhs
             (rhsType, rhsConstraint, rhsVars) <- typeOf env rhs
             return ( Type.Bool
-                   , Set.insert (lhsType, rhsType) (lhsConstraint <> rhsConstraint)
+                   , (lhsType, rhsType) : lhsConstraint <> rhsConstraint
                    , lhsVars <> rhsVars
                    )
 
@@ -96,18 +96,18 @@ typeOf :: Env -> Term -> TypeChecker (Type, Constraint, Variables)
 typeOf env term =
     case term of
         Term.Bool _ _ ->
-            return (Type.Bool, Set.empty, Set.empty)
+            return (Type.Bool, [], Set.empty)
 
         Term.Int _ _ ->
-            return (Type.Int, Set.empty, Set.empty)
+            return (Type.Int, [], Set.empty)
 
         Term.If pos condTerm thenTerm elseTerm -> do
             (condType, condConstraint, condVars) <- typeOf env condTerm
             (thenType, thenConstraint, thenVars) <- typeOf env thenTerm
             (elseType, elseConstraint, elseVars) <- typeOf env elseTerm
             let constraint =
-                    Set.insert (condType, Type.Bool) $
-                        Set.insert (thenType, elseType) $
+                    (condType, Type.Bool) :
+                        (thenType, elseType) :
                             condConstraint <> thenConstraint <> elseConstraint
             let variables = condVars <> thenVars <> elseVars
             return (thenType, constraint, variables)
@@ -115,7 +115,7 @@ typeOf env term =
         Term.Variable pos identifier ->
             case Map.lookup identifier env of
                 Just type_ ->
-                    return (type_, Set.empty, Set.empty)
+                    return (type_, [], Set.empty)
                 Nothing ->
                     Except.throwError $ TypeError $
                         T.pack (Term.sourcePosPretty pos)
@@ -139,7 +139,7 @@ typeOf env term =
             var <- newVariable
             let retType = Type.Var var
             let constraint =
-                    Set.insert (funType, Type.Function argType retType) $
+                    (funType, Type.Function argType retType) :
                         funConstraint <> argConstraint
             let variables = Set.insert var (funVars <> argVars)
             return (retType, constraint, variables)
@@ -158,28 +158,23 @@ type Substitution = [(Type.Variable, Type)]
 
 -- 型制約を充足するような最も一般的な型代入を返す。
 unify :: Constraint -> Either TypeError Substitution
-unify constraint =
-    unify' (Set.toList constraint)
-  where
-    unify' :: [(Type, Type)] -> Either TypeError Substitution
-    unify' [] =
-        return []
-    unify' ((type1, type2):cs) =
-        if type1 == type2 then
-            unify' cs
-        else
-            case (type1, type2) of
-                (Type.Var var1, _) ->
-                    (:) <$> pure (var1, type2) <*> unify' (substituteConstraint var1 type2 cs)
+unify [] = return []
+unify ((type1, type2):cs) =
+    if type1 == type2 then
+        unify cs
+    else
+        case (type1, type2) of
+            (Type.Var var1, _) ->
+                (:) <$> pure (var1, type2) <*> unify (substituteConstraint var1 type2 cs)
 
-                (_, Type.Var var2) ->
-                    (:) <$> pure (var2, type1) <*> unify' (substituteConstraint var2 type1 cs)
+            (_, Type.Var var2) ->
+                (:) <$> pure (var2, type1) <*> unify (substituteConstraint var2 type1 cs)
 
-                (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
-                    unify' ((arg1, arg2) : (ret1, ret2) : cs)
+            (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
+                unify ((arg1, arg2) : (ret1, ret2) : cs)
 
-                _ ->
-                    Left $ TypeError "failed to unify"
+            _ ->
+                Left $ TypeError "failed to unify"
 
 
 substituteConstraint :: Type.Variable -> Type -> [(Type, Type)] -> [(Type, Type)]
