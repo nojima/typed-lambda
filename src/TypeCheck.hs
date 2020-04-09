@@ -7,11 +7,10 @@ import           Type (Type)
 import qualified Type
 import           Identifier (Identifier)
 import qualified Identifier
-import qualified Data.Text as T
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
-import qualified Control.Monad.State.Strict as State
 import qualified Control.Monad.Except as Except
+import qualified Control.Monad.State.Strict as State
+import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
 
 newtype TypeError = TypeError T.Text
 
@@ -33,7 +32,7 @@ data Constraint =
     CEqual Type Type SourcePos
 
 -- 型変数の集合
-type Variables = Set.Set Type.Variable
+type Variables = [Type.Variable]
 
 newVariable :: TypeChecker Type.Variable
 newVariable = do
@@ -100,10 +99,10 @@ constrain :: Env -> Term -> TypeChecker (Type, Constraints, Variables)
 constrain env term =
     case term of
         Term.Bool _ _ ->
-            return (Type.Bool, [], Set.empty)
+            return (Type.Bool, [], [])
 
         Term.Int _ _ ->
-            return (Type.Int, [], Set.empty)
+            return (Type.Int, [], [])
 
         Term.If pos condTerm thenTerm elseTerm -> do
             (condType, condConstraints, condVars) <- constrain env condTerm
@@ -119,7 +118,7 @@ constrain env term =
         Term.Variable pos identifier ->
             case Map.lookup identifier env of
                 Just type_ ->
-                    return (type_, [], Set.empty)
+                    return (type_, [], [])
                 Nothing ->
                     Except.throwError $ TypeError $
                         T.pack (Term.sourcePosPretty pos)
@@ -134,7 +133,7 @@ constrain env term =
             (bodyType, bodyConstraints, bodyVars) <- constrain bodyEnv body
             return ( Type.Function argType bodyType
                    , bodyConstraints
-                   , Set.insert var bodyVars
+                   , var : bodyVars
                    )
 
         Term.Apply pos fun arg -> do
@@ -145,7 +144,7 @@ constrain env term =
             let constraints =
                     CEqual funType (Type.Function argType retType) pos :
                     funConstraints <> argConstraints
-            let variables = Set.insert var (funVars <> argVars)
+            let variables = var : funVars <> argVars
             return (retType, constraints, variables)
 
         Term.BinOp pos operator lhs rhs ->
