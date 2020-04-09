@@ -174,8 +174,17 @@ unify ((type1, type2):cs) =
                 unify ((arg1, arg2) : (ret1, ret2) : cs)
 
             _ ->
-                Left $ TypeError "failed to unify"
-
+                let
+                    errorMessage =
+                        "Type mismatch\n"
+                        <> "  Expected: "
+                        <> Type.pretty type2
+                        <> "\n"
+                        <> "  Actual: "
+                        <> Type.pretty type1
+                        <> "\n"
+                in
+                Left $ TypeError errorMessage
 
 substituteConstraint :: Type.Variable -> Type -> [(Type, Type)] -> [(Type, Type)]
 substituteConstraint var type_ =
