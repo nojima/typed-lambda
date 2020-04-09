@@ -11,6 +11,7 @@ import qualified Control.Monad.Except as Except
 import qualified Control.Monad.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
+import           Control.Monad
 
 newtype TypeError = TypeError T.Text
 
@@ -20,9 +21,11 @@ data TypingState = TypingState
 
 type TypeChecker a = Except.ExceptT TypeError (State.State TypingState) a
 
+data TypeScheme = ForAll [Type.Variable] Type
+
 -- 型環境
 -- 変数名からその型へのマップ。
-type Env = Map.Map Identifier Type
+type Env = Map.Map Identifier TypeScheme
 
 -- 型制約
 -- 等式 S = T の集合。ただし S と T は型。
@@ -117,7 +120,8 @@ constrain env term =
 
         Term.Variable pos identifier ->
             case Map.lookup identifier env of
-                Just type_ ->
+                Just typeScheme -> do
+                    type_ <- instantiate typeScheme
                     return (type_, [], [])
                 Nothing ->
                     Except.throwError $ TypeError $
@@ -129,7 +133,7 @@ constrain env term =
         Term.Lambda _ argName body -> do
             var <- newVariable
             let argType = Type.Var var
-            let bodyEnv = Map.insert argName argType env
+            let bodyEnv = Map.insert argName (ForAll [] argType) env
             (bodyType, bodyConstraints, bodyVars) <- constrain bodyEnv body
             return ( Type.Function argType bodyType
                    , bodyConstraints
@@ -152,9 +156,50 @@ constrain env term =
 
         Term.Let _ name expr body -> do
             (exprType, exprConstraints, exprVars) <- constrain env expr
-            let bodyEnv = Map.insert name exprType env
+            sub <- Except.liftEither $ unify exprConstraints
+            let principalType = applySubstitution sub exprType
+            let typeScheme = generalize env principalType
+
+            let bodyEnv = Map.insert name typeScheme env
             (bodyType, bodyConstraints, bodyVars) <- constrain bodyEnv body
             return (bodyType, exprConstraints <> bodyConstraints, exprVars <> bodyVars)
+
+-- 型スキームを具体化する
+instantiate :: TypeScheme -> TypeChecker Type
+instantiate (ForAll vars type_) = do
+    sub <- forM vars $ \var -> do
+        newVar <- newVariable
+        return (var, Type.Var newVar)
+    return $ applySubstitution sub type_
+
+generalize :: Env -> Type -> TypeScheme
+generalize env type_ =
+    case type_ of
+        Type.Function arg ret ->
+            let
+                ForAll argVars argType = generalize env arg
+                ForAll retVars retType = generalize env ret
+            in
+            ForAll (argVars <> retVars) (Type.Function argType retType)
+
+        Type.Var var | not (variableExists var env) ->
+            ForAll [var] type_
+
+        _ ->
+            ForAll [] type_
+
+variableExists :: Type.Variable -> Env -> Bool
+variableExists var =
+    any $ \(ForAll _ type_) -> f type_
+  where
+    f type_ =
+        case type_ of
+            Type.Function arg ret ->
+                f arg || f ret
+            Type.Var v | v == var ->
+                True
+            _ ->
+                False
 
 -- 型代入
 type Substitution = [(Type.Variable, Type)]
@@ -189,7 +234,6 @@ unify (CEqual type1 type2 pos : cs) =
                         <> "\n"
                 in
                 Left $ TypeError errorMessage
-
 
 substituteConstraints :: Type.Variable -> Type -> Constraints -> Constraints
 substituteConstraints var type_ =
