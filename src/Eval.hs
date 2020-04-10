@@ -5,12 +5,10 @@ import           Term (Term, Operator)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
-import           Value (Value, Frame(..))
+import           Value (Value, Frame(..), RuntimeError(..))
+import qualified Predefined
 import qualified Value
-import           Data.Text (Text)
 import qualified Data.Text as T
-
-newtype RuntimeError = RuntimeError Text
 
 lookupVariable :: Identifier -> Frame -> Maybe Value
 lookupVariable identifier (Frame argumentName argumentValue parent) =
@@ -66,6 +64,9 @@ evalApply frame function argument = do
             in
             eval newFrame body
 
+        Value.NativeFunction _ f ->
+            f argumentValue
+
         value ->
             let
                 errorMessage =
@@ -103,6 +104,14 @@ toBool value =
             in
             Left $ RuntimeError errorMessage
 
+isEqual :: Value -> Value -> Bool
+isEqual value1 value2 =
+    case (value1, value2) of
+        (Value.Bool b1, Value.Bool b2) -> b1 == b2
+        (Value.Int  i1, Value.Int  i2) -> i1 == i2
+        (Value.List l1, Value.List l2) -> and (zipWith isEqual l1 l2)
+        _ -> False
+
 evalBinOp :: Frame -> Operator -> Term -> Term -> Either RuntimeError Value
 evalBinOp frame operator lhs rhs = do
     lhsValue <- eval frame lhs
@@ -115,7 +124,7 @@ evalBinOp frame operator lhs rhs = do
         Term.Div   -> Value.Int  <$> (div  <$> toInt  lhsValue <*> toInt  rhsValue)
         Term.And   -> Value.Bool <$> ((&&) <$> toBool lhsValue <*> toBool rhsValue)
         Term.Or    -> Value.Bool <$> ((||) <$> toBool lhsValue <*> toBool rhsValue)
-        Term.Equal -> return $ Value.Bool (lhsValue == rhsValue)
+        Term.Equal -> return $ Value.Bool (isEqual lhsValue rhsValue)
 
 evalLet :: Frame -> Identifier -> Term -> Term -> Either RuntimeError Value
 evalLet frame name expr body = do
@@ -171,6 +180,11 @@ eval frame term =
 run :: Term -> Either RuntimeError Value
 run term =
     let
-        topFrame = Frame (Identifier.Identifier "") (Value.Bool False) Nothing
+        initialFrame =
+            foldr
+                (\(Predefined.Function name _ f) frame ->
+                    Frame name (Value.NativeFunction name f) (Just frame))
+                (Frame "" undefined Nothing)
+                Predefined.functions
     in
-    eval topFrame term
+    eval initialFrame term

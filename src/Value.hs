@@ -1,4 +1,4 @@
-module Value (Value(..), Frame(..)) where
+module Value (Value(..), Frame(..), RuntimeError(..)) where
 
 import Term (Term)
 import qualified Term
@@ -11,7 +11,9 @@ data Value
     | Int Integer
     | List [Value]
     | Closure Frame Identifier Term
-    deriving (Eq)
+    | NativeFunction Identifier (Value -> Either RuntimeError Value)
+
+newtype RuntimeError = RuntimeError T.Text
 
 instance Show Value where
     show value =
@@ -21,6 +23,8 @@ instance Show Value where
                 ++ T.unpack (Identifier.name name)
                 ++ " "
                 ++ T.unpack (Term.pretty 1 body)
+            NativeFunction name _ ->
+                "NativeFunction " ++ T.unpack (Identifier.name name)
             List elements ->
                 "List " ++ show elements
             Bool bool ->
@@ -33,4 +37,4 @@ data Frame = Frame
     , variableValue :: Value
     , parentFrame   :: Maybe Frame
     }
-    deriving (Show, Eq)
+    deriving (Show)

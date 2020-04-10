@@ -2,6 +2,7 @@
 module Type
     ( Type(..)
     , Variable
+    , TypeScheme(..)
     , pretty
     ) where
 
@@ -18,6 +19,9 @@ data Type
     deriving (Show, Eq, Ord)
 
 type Variable = Identifier
+
+data TypeScheme = ForAll [Variable] Type
+    deriving (Show)
 
 pretty :: Type -> Text
 pretty type_ =

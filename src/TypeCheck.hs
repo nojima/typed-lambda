@@ -3,10 +3,11 @@ module TypeCheck (typeCheck, TypeError(..)) where
 
 import           Term (Term, Operator, SourcePos)
 import qualified Term
-import           Type (Type)
+import           Type (Type, TypeScheme(..))
 import qualified Type
 import           Identifier (Identifier)
 import qualified Identifier
+import qualified Predefined
 import qualified Control.Monad.Except as Except
 import qualified Control.Monad.State.Strict as State
 import qualified Data.Map.Strict as Map
@@ -14,8 +15,6 @@ import qualified Data.Text as T
 import           Control.Monad
 
 -------------------------------------------------------------------------------
-
-data TypeScheme = ForAll [Type.Variable] Type
 
 -- 型を一般化して型スキームにする。
 generalize :: Env -> Type -> TypeScheme
@@ -27,6 +26,10 @@ generalize env type_ =
                 ForAll retVars retType = generalize env ret
             in
             ForAll (argVars <> retVars) (Type.Function argType retType)
+
+        Type.List element ->
+            let ForAll elementVars elementType = generalize env element in
+            ForAll elementVars (Type.List elementType)
 
         Type.Var var | not (variableExists var env) ->
             ForAll [var] type_
@@ -65,6 +68,8 @@ variableExists var =
         case type_ of
             Type.Function arg ret ->
                 f arg || f ret
+            Type.List element ->
+                f element
             Type.Var v | v == var ->
                 True
             _ ->
@@ -85,6 +90,8 @@ substituteType var type_ target =
     case target of
         Type.Function arg ret ->
             Type.Function (substituteType var type_ arg) (substituteType var type_ ret)
+        Type.List element ->
+            Type.List (substituteType var type_ element)
         Type.Var v | v == var ->
             type_
         _ ->
@@ -99,6 +106,8 @@ applySubstitution sub =
         case type_ of
             Type.Function arg ret ->
                 Type.Function (apply sub_ arg) (apply sub_ ret)
+            Type.List element ->
+                Type.List (apply sub_ element)
             Type.Var v ->
                 case Map.lookup v sub_ of
                     Just t ->
@@ -133,6 +142,9 @@ unify (CEqual type1 type2 pos : cs) =
 
             (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
                 unify (CEqual arg1 arg2 pos : CEqual ret1 ret2 pos : cs)
+
+            (Type.List element1, Type.List element2) ->
+                unify (CEqual element1 element2 pos : cs)
 
             _ ->
                 let
@@ -310,9 +322,14 @@ constrain env term =
 
 typeCheck :: Term -> Either TypeError Type
 typeCheck term = do
+    let initialEnv =
+            Map.fromList $
+                map (\(Predefined.Function name typeScheme _) -> (name, typeScheme))
+                Predefined.functions
+
     (type_, constraintss) <-
         State.evalState
-            (Except.runExceptT (constrain Map.empty term))
+            (Except.runExceptT (constrain initialEnv term))
             TypingState { stateNextId = 0 }
 
     sub <- unify constraintss
