@@ -209,13 +209,13 @@ expr_ =
         , [ binaryOperator Expr.InfixL "||" Term.Or ]
         ]
         <?> "expression"
-    where
-        binaryOperator infix_ name op =
-            infix_ $
-                Term.BinOp
-                    <$> Parsec.getSourcePos
-                    <*> pure op
-                    <*  symbol name
+  where
+    binaryOperator infix_ name op =
+        infix_ $
+            Term.BinOp
+                <$> Parsec.getSourcePos
+                <*> pure op
+                <*  symbol name
 
 letExpr :: Parser Term
 letExpr =
