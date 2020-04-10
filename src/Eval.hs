@@ -114,6 +114,8 @@ isEqual value1 value2 =
             i1 == i2
         (Value.List l1, Value.List l2) ->
             length l1 == length l2 && and (zipWith isEqual l1 l2)
+        (Value.Tuple t1, Value.Tuple t2) ->
+            and (Vector.zipWith isEqual t1 t2)
         _ ->
             False
 
