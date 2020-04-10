@@ -35,9 +35,9 @@ lexeme :: Parser a -> Parser a
 lexeme =
     Lexer.lexeme space
 
-symbol :: Text -> Parser Text
-symbol =
-    Lexer.symbol space
+symbol :: Text -> Parser ()
+symbol s =
+    () <$ Lexer.symbol space s
 
 decimal :: Parser Integer
 decimal =
@@ -147,24 +147,24 @@ variable =
 parens :: Parser Term
 parens = do
     pos <- Parsec.getSourcePos
-    _ <- symbol "("
+    symbol "("
     Parsec.choice
         [ do
             -- Pattern 1: empty tuple
-            _ <- symbol ")"
+            symbol ")"
             return $ Term.Tuple pos []
         , do
             e <- expr
             Parsec.choice
                 [ do
                     -- Pattern 2: expression enclosed by parentheses
-                    _ <- symbol ")"
+                    symbol ")"
                     return e
                 , do
                     -- Pattern 3: nonempty tuple
-                    _ <- symbol ","
+                    symbol ","
                     es <- expr `Parsec.sepBy` symbol ","
-                    _ <- symbol ")"
+                    symbol ")"
                     return $ Term.Tuple pos (e:es)
                 ]
         ]
