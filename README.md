@@ -117,6 +117,38 @@ in
 fact 5
 ```
 
+### List
+
+`[x1, x2, ..., xn]` という構文でリストを定義できます。
+また、以下の関数がリストに対して使えます。
+
+| 関数名 | 型 | 説明
+|-------|----|-----
+| `head` | `List[a] -> a` | リストの先頭を返す。リストが空なら実行時エラー。
+| `tail` | `List[a] -> List[a]` | リストの先頭以外の要素を返す。リストが空なら実行時エラー。
+| `null` | `List[a] -> Bool` | リストが空なら `true` を返し、そうでないなら `false` を返す。
+| `cons` | `a -> List[a] -> List[a]` | 第二引数の先頭に第一引数を付け加えたリストを返す。
+
+例:
+
+```
+def map f =
+  lambda list.
+    if null list then
+      []
+    else
+      let x  = head list in
+      let xs = tail list in
+      cons (f x) (map f xs)
+in
+
+def double x =
+  x * x
+in
+
+map double [1, 2, 3, 4, 5]
+```
+
 ### 二項演算子
 
 | シンボル | 意味 | 型 | 結合
