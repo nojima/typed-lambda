@@ -9,11 +9,13 @@ module Type
 import           Identifier (Identifier)
 import qualified Identifier
 import           Data.Text (Text)
+import qualified Data.Text as T
 
 data Type
     = Bool
     | Int
     | List Type
+    | Tuple [Type]
     | Function Type Type
     | Var Variable
     deriving (Show, Eq, Ord)
@@ -34,6 +36,9 @@ pretty type_ =
 
         List element ->
             "List[" <> pretty element <> "]"
+
+        Tuple elements ->
+            "Tuple[" <> T.intercalate "," (map pretty elements) <> "]"
 
         Function arg ret ->
             "(" <> pretty arg <> " -> " <> pretty ret <> ")"

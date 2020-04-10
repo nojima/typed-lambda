@@ -26,6 +26,7 @@ data Term
     | Let      SourcePos Identifier Term Term
     | Def      SourcePos Identifier Identifier Term Term
     | List     SourcePos [Term]
+    | Tuple    SourcePos [Term]
     deriving (Show, Eq)
 
 data Operator
@@ -51,6 +52,7 @@ sourcePos term =
         Let sp _ _ _ -> sp
         Def sp _ _ _ _ -> sp
         List sp _ -> sp
+        Tuple sp _ -> sp
 
 mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
 mapSourcePos f term =
@@ -65,6 +67,7 @@ mapSourcePos f term =
         Let sp vn ve b -> Let (f sp) vn (mapSourcePos f ve) (mapSourcePos f b)
         Def sp name arg expr b -> Def (f sp) name arg (mapSourcePos f expr) (mapSourcePos f b)
         List sp terms -> List (f sp) (map (mapSourcePos f) terms)
+        Tuple sp terms -> Tuple (f sp) (map (mapSourcePos f) terms)
 
 pretty :: Int -> Term -> Text
 pretty indentLevel term =
@@ -145,6 +148,11 @@ pretty indentLevel term =
             "LIST ["
             <> T.intercalate "," (map (pretty (indentLevel + 1)) elements)
             <> "]"
+
+        Tuple _ elements ->
+            "TUPLE ("
+            <> T.intercalate "," (map (pretty (indentLevel + 1)) elements)
+            <> ")"
 
 operatorPretty :: Operator -> Text
 operatorPretty operator =

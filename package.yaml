@@ -26,6 +26,7 @@ dependencies:
 - mtl
 - parser-combinators
 - text
+- vector
 - hspec
 - QuickCheck
 

@@ -145,11 +145,29 @@ variable =
         <*> identifier
 
 parens :: Parser Term
-parens =
-    Parsec.between
-        (symbol "(")
-        (symbol ")")
-        expr
+parens = do
+    pos <- Parsec.getSourcePos
+    _ <- symbol "("
+    Parsec.choice
+        [ do
+            -- Pattern 1: empty tuple
+            _ <- symbol ")"
+            return $ Term.Tuple pos []
+        , do
+            e <- expr
+            Parsec.choice
+                [ do
+                    -- Pattern 2: expression enclosed by parentheses
+                    _ <- symbol ")"
+                    return e
+                , do
+                    -- Pattern 3: nonempty tuple
+                    _ <- symbol ","
+                    es <- expr `Parsec.sepBy` symbol ","
+                    _ <- symbol ")"
+                    return $ Term.Tuple pos (e:es)
+                ]
+        ]
 
 term_ :: Parser Term
 term_ =

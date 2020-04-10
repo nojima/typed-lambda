@@ -9,6 +9,7 @@ import           Value (Value, Frame(..), RuntimeError(..))
 import qualified Predefined
 import qualified Value
 import qualified Data.Text as T
+import qualified Data.Vector as Vector
 
 lookupVariable :: Identifier -> Frame -> Maybe Value
 lookupVariable identifier (Frame argumentName argumentValue parent) =
@@ -148,6 +149,11 @@ evalList frame elements = do
     values <- traverse (eval frame) elements
     return $ Value.List values
 
+evalTuple :: Frame -> [Term] -> Either RuntimeError Value
+evalTuple frame elements = do
+    values <- traverse (eval frame) elements
+    return $ Value.Tuple (Vector.fromList values)
+
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
@@ -180,6 +186,9 @@ eval frame term =
 
         Term.List _ elements ->
             evalList frame elements
+
+        Term.Tuple _ elements ->
+            evalTuple frame elements
 
 run :: Term -> Either RuntimeError Value
 run term =

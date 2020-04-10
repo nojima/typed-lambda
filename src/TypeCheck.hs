@@ -31,6 +31,16 @@ generalize env type_ =
             let ForAll elementVars elementType = generalize env element in
             ForAll elementVars (Type.List elementType)
 
+        Type.Tuple elements ->
+            let
+                (vars, types) =
+                    foldr
+                        (\(ForAll vars1 type1) (vars2, types2) -> (vars1 <> vars2, type1:types2))
+                        ([], [])
+                        (map (generalize env) elements)
+            in
+            ForAll vars (Type.Tuple types)
+
         Type.Var var | not (variableExists var env) ->
             ForAll [var] type_
 
@@ -70,6 +80,8 @@ variableExists var =
                 f arg || f ret
             Type.List element ->
                 f element
+            Type.Tuple elements ->
+                any f elements
             Type.Var v | v == var ->
                 True
             _ ->
@@ -92,6 +104,8 @@ substituteType var type_ target =
             Type.Function (substituteType var type_ arg) (substituteType var type_ ret)
         Type.List element ->
             Type.List (substituteType var type_ element)
+        Type.Tuple elements ->
+            Type.Tuple (map (substituteType var type_) elements)
         Type.Var v | v == var ->
             type_
         _ ->
@@ -108,6 +122,8 @@ applySubstitution sub =
                 Type.Function (apply sub_ arg) (apply sub_ ret)
             Type.List element ->
                 Type.List (apply sub_ element)
+            Type.Tuple elements ->
+                Type.Tuple (map (apply sub_) elements)
             Type.Var v ->
                 case Map.lookup v sub_ of
                     Just t ->
@@ -145,6 +161,13 @@ unify (CEqual type1 type2 pos : cs) =
 
             (Type.List element1, Type.List element2) ->
                 unify (CEqual element1 element2 pos : cs)
+
+            (Type.Tuple elements1, Type.Tuple elements2) | length elements1 == length elements2 ->
+                let
+                    newConstraints =
+                        zipWith (\e1 e2 -> CEqual e1 e2 pos) elements1 elements2
+                in
+                unify (newConstraints <> cs)
 
             _ ->
                 let
@@ -316,6 +339,16 @@ constrain env term =
                 return ( Type.List type_
                        , map (\t -> CEqual t type_ pos) types
                          <> concat constraints
+                       )
+
+        Term.Tuple _ elements ->
+            if null elements then
+                return (Type.Tuple [], [])
+            else do
+                typesAndConstraints <- traverse (constrain env) elements
+                let (types, constraints) = unzip typesAndConstraints
+                return ( Type.Tuple types
+                       , concat constraints
                        )
 
 -------------------------------------------------------------------------------
