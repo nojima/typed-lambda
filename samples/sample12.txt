@@ -1,0 +1,15 @@
+def map f =
+  lambda list.
+    if null list then
+      []
+    else
+      let x  = head list in
+      let xs = tail list in
+      cons (f x) (map f xs)
+in
+
+def double x =
+  x * x
+in
+
+map double [1, 2, 3, 4, 5]
