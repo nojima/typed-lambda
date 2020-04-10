@@ -308,7 +308,7 @@ constrain env term =
             (bodyType, bodyConstraints) <- constrain bodyEnv body
             return (bodyType, exprConstraints <> bodyConstraints)
 
-        Term.Def _ name argName expr body -> do
+        Term.Def pos name argName expr body -> do
             argVar <- newVariable
             let argType = Type.Var argVar
 
@@ -319,14 +319,15 @@ constrain env term =
                     Map.insert argName (ForAll [] argType) $
                         Map.insert name (ForAll [] funType) env
 
-            (_, exprConstraints) <- constrain exprEnv expr
-            sub <- Except.liftEither $ unify exprConstraints
+            (exprType, exprConstraints) <- constrain exprEnv expr
+            let newConstraints = CEqual (Type.Var retVar) exprType pos : exprConstraints
+            sub <- Except.liftEither $ unify newConstraints
             let principalType = applySubstitution sub funType
             let typeScheme = generalize env principalType
 
             let bodyEnv = Map.insert name typeScheme env
             (bodyType, bodyConstraints) <- constrain bodyEnv body
-            return (bodyType, exprConstraints <> bodyConstraints)
+            return (bodyType, newConstraints <> bodyConstraints)
 
         Term.List pos elements ->
             if null elements then do
