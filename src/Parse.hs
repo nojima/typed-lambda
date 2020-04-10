@@ -169,8 +169,8 @@ parens = do
                 ]
         ]
 
-term_ :: Parser Term
-term_ =
+simpleTerm :: Parser Term
+simpleTerm =
     Parsec.choice
         [ boolLiteral
         , natLiteral
@@ -185,7 +185,7 @@ term_ =
 term :: Parser Term
 term =
     let
-        successiveTerms = Parsec.some term_
+        successiveTerms = Parsec.some simpleTerm
     in
     foldl1'
         (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
