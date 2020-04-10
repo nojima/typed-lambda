@@ -6,6 +6,7 @@ import           Type (TypeScheme(..))
 import qualified Type
 import           Value (Value, RuntimeError(..))
 import qualified Value
+import           Data.Vector ((!))
 
 data Function =
     Function
@@ -36,6 +37,16 @@ functions =
         (ForAll ["a"]
             (Type.Function (Type.Var "a") (Type.Function (Type.List (Type.Var "a")) (Type.List (Type.Var "a")))))
         pdCons1
+    , Function
+        "fst"
+        (ForAll ["a", "b"]
+            (Type.Function (Type.Tuple [Type.Var "a", Type.Var "b"]) (Type.Var "a")))
+        pdFst
+    , Function
+        "snd"
+        (ForAll ["a", "b"]
+            (Type.Function (Type.Tuple [Type.Var "a", Type.Var "b"]) (Type.Var "b")))
+        pdSnd
     ]
 
 pdHead :: Value -> Either RuntimeError Value
@@ -79,3 +90,19 @@ pdCons2 value1 value2 =
             Right $ Value.List (value1:elements)
         _ ->
             Left $ RuntimeError "cons: the 2nd argument is not a list"
+
+pdFst :: Value -> Either RuntimeError Value
+pdFst value =
+    case value of
+        Value.Tuple elements ->
+            Right $ elements ! 0
+        _ ->
+            Left $ RuntimeError "fst: the given value is not a tuple"
+
+pdSnd :: Value -> Either RuntimeError Value
+pdSnd value =
+    case value of
+        Value.Tuple elements ->
+            Right $ elements ! 1
+        _ ->
+            Left $ RuntimeError "snd: the given value is not a tuple"
