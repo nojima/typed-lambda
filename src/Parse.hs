@@ -5,20 +5,21 @@ import           Term (Term)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
+import qualified Control.Monad.Combinators.Expr as Expr
 import qualified Data.Char as Char
+import           Data.Function ((&))
+import           Data.List (foldl')
+import qualified Data.List.NonEmpty as NonEmpty
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Void (Void)
 import           Text.Megaparsec (Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 import qualified Text.Megaparsec.Error as Error
-import qualified Control.Monad.Combinators.Expr as Expr
-import           Data.Void (Void)
-import           Data.List (foldl1')
-import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Set (Set)
-import qualified Data.Set as Set
 
 type Parser a = Parsec Void Text a
 
@@ -183,13 +184,15 @@ simpleTerm =
     <?> "term"
 
 term :: Parser Term
-term =
-    let
-        successiveTerms = Parsec.some simpleTerm
-    in
-    foldl1'
-        (\lhs rhs -> Term.Apply (Term.sourcePos rhs) lhs rhs)
-        <$> successiveTerms
+term = do
+    t <- simpleTerm
+    args <- Parsec.many argument
+    return $ foldl' (&) t args
+  where
+    argument = do
+        pos <- Parsec.getSourcePos
+        arg <- simpleTerm
+        return (\fun -> Term.Apply pos fun arg)
 
 expr_ :: Parser Term
 expr_ =
