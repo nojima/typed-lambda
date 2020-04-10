@@ -53,6 +53,7 @@ keywords = Set.fromList
     , "lambda"
     , "let"
     , "in"
+    , "def"
     ]
 
 keyword :: Text -> Parser ()
@@ -109,6 +110,14 @@ natLiteral =
         <$> Parsec.getSourcePos
         <*> decimal
 
+listLiteral :: Parser Term
+listLiteral =
+    Term.List
+        <$> Parsec.getSourcePos
+        <*  symbol "["
+        <*> expr `Parsec.sepBy` symbol ","
+        <*  symbol "]"
+
 lambdaExpr :: Parser Term
 lambdaExpr =
     Term.Lambda
@@ -147,6 +156,7 @@ term_ =
     Parsec.choice
         [ boolLiteral
         , natLiteral
+        , listLiteral
         , lambdaExpr
         , ifExpr
         , variable

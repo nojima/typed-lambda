@@ -9,6 +9,7 @@ import qualified Data.Text as T
 data Value
     = Bool Bool
     | Int Integer
+    | List [Value]
     | Closure Frame Identifier Term
     deriving (Eq)
 
@@ -20,6 +21,8 @@ instance Show Value where
                 ++ T.unpack (Identifier.name name)
                 ++ " "
                 ++ T.unpack (Term.pretty 1 body)
+            List elements ->
+                "List " ++ show elements
             Bool bool ->
                 "Bool " ++ show bool
             Int int ->

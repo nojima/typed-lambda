@@ -12,6 +12,7 @@ import           Data.Text (Text)
 data Type
     = Bool
     | Int
+    | List Type
     | Function Type Type
     | Var Variable
     deriving (Show, Eq, Ord)
@@ -26,6 +27,9 @@ pretty type_ =
 
         Int ->
             "Int"
+
+        List element ->
+            "List[" <> pretty element <> "]"
 
         Function arg ret ->
             "(" <> pretty arg <> " -> " <> pretty ret <> ")"

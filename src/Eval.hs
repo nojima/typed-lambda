@@ -130,6 +130,11 @@ evalDef frame name arg expr body =
     newClosure = Value.Closure newFrame arg expr
     newFrame = Frame name newClosure (Just frame)
 
+evalList :: Frame -> [Term] -> Either RuntimeError Value
+evalList frame elements = do
+    values <- traverse (eval frame) elements
+    return $ Value.List values
+
 eval :: Frame -> Term -> Either RuntimeError Value
 eval frame term =
     case term of
@@ -159,6 +164,9 @@ eval frame term =
 
         Term.Def _ name arg expr body ->
             evalDef frame name arg expr body
+
+        Term.List _ elements ->
+            evalList frame elements
 
 run :: Term -> Either RuntimeError Value
 run term =

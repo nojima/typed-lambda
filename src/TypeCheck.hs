@@ -293,6 +293,19 @@ constrain env term =
             (bodyType, bodyConstraints) <- constrain bodyEnv body
             return (bodyType, exprConstraints <> bodyConstraints)
 
+        Term.List pos elements ->
+            if null elements then do
+                elementVar <- newVariable
+                let elementType = Type.Var elementVar
+                return (Type.List elementType, [])
+            else do
+                typesAndConstraints <- traverse (constrain env) elements
+                let (type_:types, constraints) = unzip typesAndConstraints
+                return ( Type.List type_
+                       , map (\t -> CEqual t type_ pos) types
+                         <> concat constraints
+                       )
+
 -------------------------------------------------------------------------------
 
 typeCheck :: Term -> Either TypeError Type
