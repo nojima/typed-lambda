@@ -107,10 +107,14 @@ toBool value =
 isEqual :: Value -> Value -> Bool
 isEqual value1 value2 =
     case (value1, value2) of
-        (Value.Bool b1, Value.Bool b2) -> b1 == b2
-        (Value.Int  i1, Value.Int  i2) -> i1 == i2
-        (Value.List l1, Value.List l2) -> and (zipWith isEqual l1 l2)
-        _ -> False
+        (Value.Bool b1, Value.Bool b2) ->
+            b1 == b2
+        (Value.Int  i1, Value.Int  i2) ->
+            i1 == i2
+        (Value.List l1, Value.List l2) ->
+            length l1 == length l2 && and (zipWith isEqual l1 l2)
+        _ ->
+            False
 
 evalBinOp :: Frame -> Operator -> Term -> Term -> Either RuntimeError Value
 evalBinOp frame operator lhs rhs = do
