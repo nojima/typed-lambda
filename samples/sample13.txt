@@ -1,0 +1,5 @@
+let pair = (100, true) in
+if snd pair then
+    fst pair
+else
+    200
