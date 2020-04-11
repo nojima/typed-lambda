@@ -243,7 +243,13 @@ constrainBinOp pos env operator lhs rhs =
                         (Description pos "both sides of `==` must be the same type")
             return (Type.Bool, constraint : lhsConstraints <> rhsConstraints)
 
--- 型環境 env における term の型、型制約、型変数を求める。
+calculatePrincipalType :: Env -> Type -> Constraints -> TypeChecker TypeScheme
+calculatePrincipalType env type_ constraints = do
+    sub <- Except.liftEither $ unify constraints
+    let principalType = applySubstitution sub type_
+    return $ generalize env principalType
+
+-- 型環境 env における term の型と型制約を求める。
 constrain :: Env -> Term -> TypeChecker (Type, Constraints)
 constrain env term =
     case term of
@@ -305,12 +311,12 @@ constrain env term =
             constrainBinOp pos env operator lhs rhs
 
         Term.Let _ name expr body -> do
+            -- expr の主要型を求める
             (exprType, exprConstraints) <- constrain env expr
-            sub <- Except.liftEither $ unify exprConstraints
-            let principalType = applySubstitution sub exprType
-            let typeScheme = generalize env principalType
+            exprPrincipalType <- calculatePrincipalType env exprType exprConstraints
 
-            let bodyEnv = Map.insert name typeScheme env
+            -- body の型と型制約を求める
+            let bodyEnv = Map.insert name exprPrincipalType env
             (bodyType, bodyConstraints) <- constrain bodyEnv body
             return (bodyType, bodyConstraints)
 
@@ -321,21 +327,20 @@ constrain env term =
             retVar <- newVariable
             let funType = Type.Function argType (Type.Var retVar)
 
+            -- expr の型と型制約を求める
             let exprEnv =
                     Map.insert argName (ForAll [] argType) $
                         Map.insert name (ForAll [] funType) env
-
             (exprType, exprConstraints) <- constrain exprEnv expr
-            let constraint =
+
+            -- expr を本体とする関数の主要型を求める
+            let retConstraint =
                     CEqual (Type.Var retVar) exprType
                         (Description pos "type mismatch in the returned value of the function")
-            let newConstraints = constraint : exprConstraints
+            funPrincipalType <- calculatePrincipalType env funType (retConstraint:exprConstraints)
 
-            sub <- Except.liftEither $ unify newConstraints
-            let principalType = applySubstitution sub funType
-            let typeScheme = generalize env principalType
-
-            let bodyEnv = Map.insert name typeScheme env
+            -- body の型と型制約を求める
+            let bodyEnv = Map.insert name funPrincipalType env
             (bodyType, bodyConstraints) <- constrain bodyEnv body
             return (bodyType, bodyConstraints)
 
