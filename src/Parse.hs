@@ -211,7 +211,7 @@ simpleExpr =
         <?> "expression"
   where
     binaryOperator infix_ name op =
-        infix_ $
+        infix_ $ Parsec.label "binary operator" $
             Term.BinOp
                 <$> Parsec.getSourcePos
                 <*> pure op
