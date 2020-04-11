@@ -110,7 +110,7 @@ applySubstitution sub =
     Type.mapVariable $ \v ->
         case Map.lookup v subMap of
             Just t ->
-                t
+                applySubstitution sub t
             Nothing ->
                 Type.Var v
 
@@ -123,8 +123,12 @@ type Constraints = [Constraint]
 data Constraint =
     CEqual Type Type Description
 
+instance Show Constraint where
+    show (CEqual t1 t2 _) = show t1 ++ " == " ++ show t2
+
 data Description =
     Description SourcePos T.Text
+    deriving (Show)
 
 unify :: Constraints -> Either TypeError Substitution
 unify cs = unify' (reverse cs) -- エラーメッセージをより直観的にするために reverse する
