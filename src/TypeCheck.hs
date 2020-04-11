@@ -98,40 +98,21 @@ substituteConstraints var type_ =
         CEqual (substituteType var type_ lhs) (substituteType var type_ rhs) pos
 
 substituteType :: Type.Variable -> Type -> Type -> Type
-substituteType var type_ target =
-    case target of
-        Type.Function arg ret ->
-            Type.Function (substituteType var type_ arg) (substituteType var type_ ret)
-        Type.List element ->
-            Type.List (substituteType var type_ element)
-        Type.Tuple elements ->
-            Type.Tuple (map (substituteType var type_) elements)
-        Type.Var v | v == var ->
-            type_
-        _ ->
-            target
+substituteType var type_ =
+    Type.mapVariable $ \v ->
+        if v == var
+        then type_
+        else Type.Var v
 
 applySubstitution :: Substitution -> Type -> Type
 applySubstitution sub =
-    apply (Map.fromList sub)
-  where
-    apply :: Map.Map Type.Variable Type -> Type -> Type
-    apply sub_ type_ =
-        case type_ of
-            Type.Function arg ret ->
-                Type.Function (apply sub_ arg) (apply sub_ ret)
-            Type.List element ->
-                Type.List (apply sub_ element)
-            Type.Tuple elements ->
-                Type.Tuple (map (apply sub_) elements)
-            Type.Var v ->
-                case Map.lookup v sub_ of
-                    Just t ->
-                        apply sub_ t
-                    Nothing ->
-                        type_
-            _ ->
-                type_
+    let subMap = Map.fromList sub in
+    Type.mapVariable $ \v ->
+        case Map.lookup v subMap of
+            Just t ->
+                t
+            Nothing ->
+                Type.Var v
 
 -------------------------------------------------------------------------------
 

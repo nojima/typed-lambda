@@ -3,6 +3,7 @@ module Type
     ( Type(..)
     , Variable
     , TypeScheme(..)
+    , mapVariable
     , pretty
     ) where
 
@@ -18,7 +19,28 @@ data Type
     | Tuple [Type]
     | Function Type Type
     | Var Variable
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq)
+
+mapVariable :: (Variable -> Type) -> Type -> Type
+mapVariable f type_ =
+    case type_ of
+        Bool ->
+            Bool
+
+        Int ->
+            Int
+
+        List element ->
+            List (mapVariable f element)
+
+        Tuple elements ->
+            Tuple (map (mapVariable f) elements)
+
+        Function arg ret ->
+            Function (mapVariable f arg) (mapVariable f ret)
+
+        Var var ->
+            f var
 
 type Variable = Identifier
 
