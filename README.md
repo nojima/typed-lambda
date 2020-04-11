@@ -142,11 +142,11 @@ def map f =
       cons (f x) (map f xs)
 in
 
-def double x =
+def square x =
   x * x
 in
 
-map double [1, 2, 3, 4, 5]
+map square [1, 2, 3, 4, 5]
 ```
 
 ### Tuple
