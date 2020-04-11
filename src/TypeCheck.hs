@@ -312,7 +312,7 @@ constrain env term =
 
             let bodyEnv = Map.insert name typeScheme env
             (bodyType, bodyConstraints) <- constrain bodyEnv body
-            return (bodyType, exprConstraints <> bodyConstraints)
+            return (bodyType, bodyConstraints)
 
         Term.Def pos name argName expr body -> do
             argVar <- newVariable
@@ -337,7 +337,7 @@ constrain env term =
 
             let bodyEnv = Map.insert name typeScheme env
             (bodyType, bodyConstraints) <- constrain bodyEnv body
-            return (bodyType, newConstraints <> bodyConstraints)
+            return (bodyType, bodyConstraints)
 
         Term.List pos elements ->
             if null elements then do
