@@ -194,8 +194,8 @@ term = do
         arg <- simpleTerm
         return (\fun -> Term.Apply pos fun arg)
 
-expr_ :: Parser Term
-expr_ =
+simpleExpr :: Parser Term
+simpleExpr =
     Expr.makeExprParser
         term
         [ [ binaryOperator Expr.InfixL "*" Term.Mul
@@ -245,7 +245,7 @@ expr =
     Parsec.choice
         [ letExpr
         , defExpr
-        , expr_
+        , simpleExpr
         ]
 
 program :: Parser Term
