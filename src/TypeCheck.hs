@@ -121,40 +121,50 @@ applySubstitution sub =
 type Constraints = [Constraint]
 
 data Constraint =
-    CEqual Type Type SourcePos
+    CEqual Type Type Description
+
+data Description =
+    Description SourcePos T.Text
+
+unify :: Constraints -> Either TypeError Substitution
+unify cs = unify' (reverse cs) -- エラーメッセージをより直観的にするために reverse する
 
 -- 型制約を充足するような最も一般的な型代入を返す。
-unify :: Constraints -> Either TypeError Substitution
-unify [] = return []
-unify (CEqual type1 type2 pos : cs) =
+unify' :: Constraints -> Either TypeError Substitution
+unify' [] = return []
+unify' (CEqual type1 type2 desc : cs) =
     if type1 == type2 then
-        unify cs
+        unify' cs
     else
         case (type1, type2) of
             (Type.Var var1, _) ->
-                (:) (var1, type2) <$> unify (substituteConstraints var1 type2 cs)
+                (:) (var1, type2) <$> unify' (substituteConstraints var1 type2 cs)
 
             (_, Type.Var var2) ->
-                (:) (var2, type1) <$> unify (substituteConstraints var2 type1 cs)
+                (:) (var2, type1) <$> unify' (substituteConstraints var2 type1 cs)
 
             (Type.Function arg1 ret1, Type.Function arg2 ret2) ->
-                unify (CEqual arg1 arg2 pos : CEqual ret1 ret2 pos : cs)
+                unify' (CEqual arg1 arg2 desc : CEqual ret1 ret2 desc : cs)
 
             (Type.List element1, Type.List element2) ->
-                unify (CEqual element1 element2 pos : cs)
+                unify' (CEqual element1 element2 desc : cs)
 
             (Type.Tuple elements1, Type.Tuple elements2) | length elements1 == length elements2 ->
                 let
                     newConstraints =
-                        zipWith (\e1 e2 -> CEqual e1 e2 pos) elements1 elements2
+                        zipWith (\e1 e2 -> CEqual e1 e2 desc) elements1 elements2
                 in
-                unify (newConstraints <> cs)
+                unify' (newConstraints <> cs)
 
             _ ->
                 let
+                    Description pos message = desc
+
                     errorMessage =
                         T.pack (Term.sourcePosPretty pos)
-                        <> ": type mismatch\n"
+                        <> ": "
+                        <> message
+                        <> "\n"
                         <> "  expected: "
                         <> Type.pretty type2
                         <> "\n"
@@ -174,56 +184,60 @@ newtype TypingState = TypingState
     { stateNextId :: Int }
     deriving (Eq, Show)
 
-mustBe :: Type -> SourcePos -> Env -> Term -> TypeChecker Constraints
-mustBe type_ pos env term = do
+mustBe :: Type -> SourcePos -> Env -> Term -> T.Text -> TypeChecker Constraints
+mustBe type_ pos env term errorMessage = do
     (actualType, constraints) <- constrain env term
-    return $ CEqual actualType type_ pos : constraints
+    let constraint =
+            CEqual actualType type_
+                (Description pos errorMessage)
+    return (constraint:constraints)
 
-mustBeInt :: SourcePos -> Env -> Term -> TypeChecker Constraints
+mustBeInt :: SourcePos -> Env -> Term -> T.Text -> TypeChecker Constraints
 mustBeInt = mustBe Type.Int
 
-mustBeBool :: SourcePos -> Env -> Term -> TypeChecker Constraints
+mustBeBool :: SourcePos -> Env -> Term -> T.Text -> TypeChecker Constraints
 mustBeBool = mustBe Type.Bool
 
 constrainBinOp :: SourcePos -> Env -> Operator -> Term -> Term -> TypeChecker (Type, Constraints)
 constrainBinOp pos env operator lhs rhs =
     case operator of
         Term.Add -> do
-            lhsConstraints <- mustBeInt pos env lhs
-            rhsConstraints <- mustBeInt pos env rhs
+            lhsConstraints <- mustBeInt pos env lhs "1st argument of `+` must be Int"
+            rhsConstraints <- mustBeInt pos env rhs "2nd argument of `+` must be Int"
             return (Type.Int, lhsConstraints <> rhsConstraints)
 
         Term.Sub -> do
-            lhsConstraints <- mustBeInt pos env lhs
-            rhsConstraints <- mustBeInt pos env rhs
+            lhsConstraints <- mustBeInt pos env lhs "1st argument of `-` must be Int"
+            rhsConstraints <- mustBeInt pos env rhs "2nd argument of `-` must be Int"
             return (Type.Int, lhsConstraints <> rhsConstraints)
 
         Term.Mul -> do
-            lhsConstraints <- mustBeInt pos env lhs
-            rhsConstraints <- mustBeInt pos env rhs
+            lhsConstraints <- mustBeInt pos env lhs "1st argument of `*` must be Int"
+            rhsConstraints <- mustBeInt pos env rhs "2nd argument of `*` must be Int"
             return (Type.Int, lhsConstraints <> rhsConstraints)
 
         Term.Div -> do
-            lhsConstraints <- mustBeInt pos env lhs
-            rhsConstraints <- mustBeInt pos env rhs
+            lhsConstraints <- mustBeInt pos env lhs "1st argument of `/` must be Int"
+            rhsConstraints <- mustBeInt pos env rhs "2nd argument of `/` must be Int"
             return (Type.Int, lhsConstraints <> rhsConstraints)
 
         Term.And -> do
-            lhsConstraints <- mustBeBool pos env lhs
-            rhsConstraints <- mustBeBool pos env rhs
+            lhsConstraints <- mustBeBool pos env lhs "1st argument of `&&` must be Bool"
+            rhsConstraints <- mustBeBool pos env rhs "2nd argument of `&&` must be Bool"
             return (Type.Bool, lhsConstraints <> rhsConstraints)
 
         Term.Or -> do
-            lhsConstraints <- mustBeBool pos env lhs
-            rhsConstraints <- mustBeBool pos env rhs
+            lhsConstraints <- mustBeBool pos env lhs "1st argument of `||` must be Bool"
+            rhsConstraints <- mustBeBool pos env rhs "2nd argument of `||` must be Bool"
             return (Type.Bool, lhsConstraints <> rhsConstraints)
 
         Term.Equal -> do
             (lhsType, lhsConstraints) <- constrain env lhs
             (rhsType, rhsConstraints) <- constrain env rhs
-            return ( Type.Bool
-                   , CEqual lhsType rhsType pos : lhsConstraints <> rhsConstraints
-                   )
+            let constraint =
+                    CEqual lhsType rhsType
+                        (Description pos "both sides of `==` must be the same type")
+            return (Type.Bool, constraint : lhsConstraints <> rhsConstraints)
 
 -- 型環境 env における term の型、型制約、型変数を求める。
 constrain :: Env -> Term -> TypeChecker (Type, Constraints)
@@ -239,9 +253,14 @@ constrain env term =
             (condType, condConstraints) <- constrain env condTerm
             (thenType, thenConstraints) <- constrain env thenTerm
             (elseType, elseConstraints) <- constrain env elseTerm
+            let condConstraint =
+                    CEqual condType Type.Bool
+                        (Description pos "condition of `if` expression must be Bool")
+            let thenElseConstraint =
+                    CEqual elseType thenType
+                        (Description pos "`then` and `else` have incompatible types")
             let constraints =
-                    CEqual condType Type.Bool pos :
-                    CEqual thenType elseType pos :
+                    condConstraint : thenElseConstraint :
                     condConstraints <> thenConstraints <> elseConstraints
             return (thenType, constraints)
 
@@ -271,9 +290,11 @@ constrain env term =
             (argType, argConstraints) <- constrain env arg
             var <- newVariable
             let retType = Type.Var var
+            let constraint =
+                    CEqual (Type.Function argType retType) funType
+                        (Description pos "type mismatch in the function call")
             let constraints =
-                    CEqual funType (Type.Function argType retType) pos :
-                    funConstraints <> argConstraints
+                    constraint : funConstraints <> argConstraints
             return (retType, constraints)
 
         Term.BinOp pos operator lhs rhs ->
@@ -301,7 +322,11 @@ constrain env term =
                         Map.insert name (ForAll [] funType) env
 
             (exprType, exprConstraints) <- constrain exprEnv expr
-            let newConstraints = CEqual (Type.Var retVar) exprType pos : exprConstraints
+            let constraint =
+                    CEqual (Type.Var retVar) exprType
+                        (Description pos "type mismatch in the returned value of the function")
+            let newConstraints = constraint : exprConstraints
+
             sub <- Except.liftEither $ unify newConstraints
             let principalType = applySubstitution sub funType
             let typeScheme = generalize env principalType
@@ -319,7 +344,7 @@ constrain env term =
                 typesAndConstraints <- traverse (constrain env) elements
                 let (type_:types, constraints) = unzip typesAndConstraints
                 return ( Type.List type_
-                       , map (\t -> CEqual t type_ pos) types
+                       , map (\t -> CEqual t type_ (Description pos "type mismatch")) types
                          <> concat constraints
                        )
 
