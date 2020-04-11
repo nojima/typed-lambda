@@ -80,7 +80,7 @@ identifierOrKeyword =
 
 identifier :: Parser Identifier
 identifier =
-    Parsec.try (do
+    Parsec.try $ Parsec.label "identifier" $ do
         offset <- Parsec.getOffset
         word <- identifierOrKeyword
         if Set.member word keywords then
@@ -92,7 +92,6 @@ identifier =
             Parsec.parseError err
         else
             return $ Identifier.Identifier word
-    ) <?> "identifier"
 
 --------------------------------------------------------------------------------
 
