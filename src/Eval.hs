@@ -5,21 +5,16 @@ import           Term (Term, Operator)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
-import           Value (Value, Frame(..), RuntimeError(..))
+import           Value (Value, Frame, RuntimeError(..))
 import qualified Predefined
 import qualified Value
 import qualified Data.Text as T
 import qualified Data.Vector as Vector
-
-lookupVariable :: Identifier -> Frame -> Maybe Value
-lookupVariable identifier (Frame argumentName argumentValue parent) =
-    if identifier == argumentName
-        then Just argumentValue
-        else lookupVariable identifier =<< parent
+import qualified Data.Map as Map
 
 evalVariable :: Frame -> Identifier -> Either RuntimeError Value
 evalVariable frame identifier =
-    case lookupVariable identifier frame of
+    case Map.lookup identifier frame of
         Just term ->
             Right term
 
@@ -61,7 +56,7 @@ evalApply frame function argument = do
     case functionValue of
         Value.Closure closureFrame argumentName body ->
             let
-                newFrame = Frame argumentName argumentValue (Just closureFrame)
+                newFrame = Map.insert argumentName argumentValue closureFrame
             in
             eval newFrame body
 
@@ -136,7 +131,7 @@ evalBinOp frame operator lhs rhs = do
 evalLet :: Frame -> Identifier -> Term -> Term -> Either RuntimeError Value
 evalLet frame name expr body = do
     value <- eval frame expr
-    let newFrame = Frame name value (Just frame)
+    let newFrame = Map.insert name value frame
     eval newFrame body
 
 evalDef :: Frame -> Identifier -> Identifier -> Term -> Term -> Either RuntimeError Value
@@ -144,7 +139,7 @@ evalDef frame name arg expr body =
     eval newFrame body
   where
     newClosure = Value.Closure newFrame arg expr
-    newFrame = Frame name newClosure (Just frame)
+    newFrame = Map.insert name newClosure frame
 
 evalList :: Frame -> [Term] -> Either RuntimeError Value
 evalList frame elements = do
@@ -198,8 +193,8 @@ run term =
         initialFrame =
             foldr
                 (\(Predefined.Function name _ f) frame ->
-                    Frame name (Value.NativeFunction name f) (Just frame))
-                (Frame "" undefined Nothing)
+                    Map.insert name (Value.NativeFunction name f) frame)
+                Map.empty
                 Predefined.functions
     in
     eval initialFrame term

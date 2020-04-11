@@ -1,4 +1,4 @@
-module Value (Value(..), Frame(..), RuntimeError(..)) where
+module Value (Value(..), Frame, RuntimeError(..)) where
 
 import Term (Term)
 import qualified Term
@@ -6,6 +6,7 @@ import Identifier (Identifier)
 import qualified Identifier
 import qualified Data.Text as T
 import qualified Data.Vector as Vector
+import qualified Data.Map.Strict as Map
 
 data Value
     = Bool Bool
@@ -41,9 +42,4 @@ instance Show Value where
             Int int ->
                 "Int " ++ show int
 
-data Frame = Frame
-    { variableName  :: Identifier
-    , variableValue :: Value
-    , parentFrame   :: Maybe Frame
-    }
-    deriving (Show)
+type Frame = Map.Map Identifier Value
