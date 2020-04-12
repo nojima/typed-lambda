@@ -1,0 +1,3 @@
+match (true, 10, 20) with
+  | (false, x, y) -> x - y
+  | (true,  x, y) -> x + y
