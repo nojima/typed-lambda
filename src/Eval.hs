@@ -63,8 +63,8 @@ evalMatch frame expr arms = do
                 if v == p then Just [] else Nothing
 
             (Value.Tuple v, Term.PTuple _ ps) ->
-                if length v == length ps then
-                    concat <$> sequence (Vector.zipWith match v ps)
+                if Vector.length v == length ps then
+                    concat <$> sequence (Vector.zipWith match v (Vector.fromList ps))
                 else
                     Nothing
 

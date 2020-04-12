@@ -14,7 +14,6 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Vector as Vector
 import           Data.Void (Void)
 import           Text.Megaparsec (Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
@@ -71,13 +70,13 @@ identifierOrKeyword =
     let
         alphaChar =
             Parsec.satisfy
-                (\c -> Char.isAlpha c && Char.isAscii c)
+                (\c -> (Char.isAlpha c || c == '_') && Char.isAscii c)
                 <?> "alphabet"
 
         alphaNumChars =
             Parsec.takeWhileP
                 (Just "alphabets or numbers")
-                (\c -> (Char.isAlpha c || Char.isNumber c) && Char.isAscii c)
+                (\c -> (Char.isAlpha c || Char.isNumber c || c == '_') && Char.isAscii c)
     in
     lexeme (T.cons <$> alphaChar <*> alphaNumChars)
 
@@ -250,7 +249,7 @@ pattern = do
         , Term.PBool  pos <$> (keyword "false" *> pure False)
         , Term.PInt   pos <$> decimal
         , Term.PVar   pos <$> identifier
-        , Term.PTuple pos <$> (Vector.fromList <$> tuple)
+        , Term.PTuple pos <$> tuple
         ]
   where
     tuple =

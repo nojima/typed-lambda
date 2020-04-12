@@ -244,11 +244,66 @@ constrainBinOp pos env operator lhs rhs =
             return (Type.Bool, constraint : lhsConstraints <> rhsConstraints)
 
 constrainMatch :: SourcePos -> Env -> Term -> [(Pattern, Term)] -> TypeChecker (Type, Constraints)
-constrainMatch pos env expr arms = do
+constrainMatch matchPos env expr arms = do
     (exprType, exprConstraints) <- constrain env expr
-    undefined
+    case arms of
+        [] ->
+            Except.throwError $ TypeError "[BUG] arms is empty list"
+
+        ((firstPattern, firstTerm):remainders) -> do
+            (firstPatternType, firstPatternConstraints, firstArmEnv) <- constrainArm exprType firstPattern
+            (firstArmType, firstTermConstraints) <- constrain (firstArmEnv `Map.union` env) firstTerm
+
+            constraintsList <- forM remainders $ \(pattern_, term) -> do
+                (patternType, patternConstraints, armEnv) <- constrainArm exprType pattern_
+                (armType, armConstraints) <- constrain (armEnv `Map.union` env) term
+                -- 制約1: すべての腕について、パターンの型が一致している
+                -- 制約2: すべての腕について、戻り値の型が一致している
+                return $
+                    CEqual patternType firstPatternType (Description matchPos "the type of each pattern does not match") :
+                    CEqual armType firstArmType (Description matchPos "the type of each arm does not match") :
+                    patternConstraints <> armConstraints
+
+            return ( firstArmType
+                   , firstPatternConstraints
+                     <> firstTermConstraints
+                     <> concat constraintsList
+                     <> exprConstraints
+                   )
   where
-    match :: Pattern -> (Type, [(Identifier, Type)])
+    constrainArm :: Type -> Pattern -> TypeChecker (Type, Constraints, Env)
+    constrainArm exprType pattern_ =
+        case pattern_ of
+            Term.PBool pos _ -> do
+                let constraint = CEqual exprType Type.Bool (Description pos "type mismatch")
+                return (Type.Bool, [constraint], Map.empty)
+
+            Term.PInt pos _ -> do
+                let constraint = CEqual exprType Type.Int (Description pos "type mismatch")
+                return (Type.Int, [constraint], Map.empty)
+
+            Term.PVar pos name -> do
+                type_ <- Type.Var <$> newVariable
+                let typeScheme = ForAll [] type_
+                let constraint = CEqual type_ exprType (Description pos "type mismatch")
+                return ( type_
+                       , [constraint]
+                       , if name == "_" then Map.empty else Map.singleton name typeScheme
+                       )
+
+            Term.PTuple pos patterns -> do
+                -- (1) expr の型がタプルであるという制約を生成する
+                tupleElements <- replicateM (length patterns) (Type.Var <$> newVariable)
+                let tupleType = Type.Tuple tupleElements
+                let tupleConstraint = CEqual tupleType exprType (Description pos "type mismatch")
+
+                -- (2) patterns から制約を生成する
+                (_, constraintsList, envs) <- unzip3 <$> zipWithM constrainArm tupleElements patterns
+
+                return ( tupleType
+                       , tupleConstraint : concat constraintsList
+                       , Map.unions envs
+                       )
 
 calculatePrincipalType :: Env -> Type -> Constraints -> TypeChecker TypeScheme
 calculatePrincipalType env type_ constraints = do

@@ -14,7 +14,6 @@ import qualified Identifier
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Functor ()
-import qualified Data.Vector as Vector
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 
 data Term
@@ -46,7 +45,7 @@ data Pattern
     = PBool  !SourcePos !Bool
     | PInt   !SourcePos !Integer
     | PVar   !SourcePos !Identifier
-    | PTuple !SourcePos (Vector.Vector Pattern)
+    | PTuple !SourcePos [Pattern]
     deriving (Show, Eq)
 
 mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
@@ -173,7 +172,8 @@ operatorPretty operator =
         Equal -> "=="
 
 patternPretty :: Pattern -> Text
-patternPretty = undefined
+patternPretty pattern_ =
+    T.pack (show pattern_)
 
 indent :: Int -> Text
 indent level =
