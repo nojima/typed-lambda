@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Eval (eval, run, RuntimeError(..)) where
 
-import           Term (Term, Operator)
+import           Term (Term, Pattern, Operator)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
@@ -47,6 +47,44 @@ evalIf frame condTerm thenTerm elseTerm = do
         eval frame thenTerm
     else
         eval frame elseTerm
+
+evalMatch :: Frame -> Term -> [(Pattern, Term)] -> Either RuntimeError Value
+evalMatch frame expr arms = do
+    value <- eval frame expr
+    loop value arms
+  where
+    match :: Value -> Pattern -> Maybe [(Identifier, Value)]
+    match value pattern_ =
+        case (value, pattern_) of
+            (Value.Bool v, Term.PBool _ p) ->
+                if v == p then Just [] else Nothing
+
+            (Value.Int v, Term.PInt _ p) ->
+                if v == p then Just [] else Nothing
+
+            (Value.Tuple v, Term.PTuple _ ps) ->
+                if length v == length ps then
+                    concat <$> sequence (Vector.zipWith match v ps)
+                else
+                    Nothing
+
+            (_, Term.PVar _ name) ->
+                if name == "_" then
+                    Just []
+                else
+                    Just [(name, value)]
+
+            _ -> Nothing
+
+    loop _ [] = Left $ RuntimeError "non-exhaustive pattern"
+    loop value ((pattern_, term):remainder) =
+        case match value pattern_ of
+            Nothing ->
+                loop value remainder
+
+            Just captures ->
+                let newFrame = Map.fromList captures `Map.union` frame in
+                eval newFrame term
 
 evalApply :: Frame -> Term -> Term -> Either RuntimeError Value
 evalApply frame function argument = do
@@ -162,6 +200,9 @@ eval frame term =
 
         Term.If _ condTerm thenTerm elseTerm ->
             evalIf frame condTerm thenTerm elseTerm
+
+        Term.Match _ expr arms ->
+            evalMatch frame expr arms
 
         Term.Variable _ identifier ->
             evalVariable frame identifier

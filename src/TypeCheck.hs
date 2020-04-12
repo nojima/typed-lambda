@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TypeCheck (typeCheck, TypeError(..)) where
 
-import           Term (Term, Operator, SourcePos)
+import           Term (Term, Operator, Pattern, SourcePos)
 import qualified Term
 import           Type (Type, TypeScheme(..))
 import qualified Type
@@ -243,6 +243,13 @@ constrainBinOp pos env operator lhs rhs =
                         (Description pos "both sides of `==` must be the same type")
             return (Type.Bool, constraint : lhsConstraints <> rhsConstraints)
 
+constrainMatch :: SourcePos -> Env -> Term -> [(Pattern, Term)] -> TypeChecker (Type, Constraints)
+constrainMatch pos env expr arms = do
+    (exprType, exprConstraints) <- constrain env expr
+    undefined
+  where
+    match :: Pattern -> (Type, [(Identifier, Type)])
+
 calculatePrincipalType :: Env -> Type -> Constraints -> TypeChecker TypeScheme
 calculatePrincipalType env type_ constraints = do
     sub <- Except.liftEither $ unify constraints
@@ -273,6 +280,9 @@ constrain env term =
                     condConstraint : thenElseConstraint :
                     condConstraints <> thenConstraints <> elseConstraints
             return (thenType, constraints)
+
+        Term.Match pos expr arms ->
+            constrainMatch pos env expr arms
 
         Term.Variable pos identifier ->
             case Map.lookup identifier env of

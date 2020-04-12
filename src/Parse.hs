@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Parse (parse) where
 
-import           Term (Term)
+import           Term (Term, Pattern)
 import qualified Term
 import           Identifier (Identifier)
 import qualified Identifier
@@ -14,6 +14,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Vector as Vector
 import           Data.Void (Void)
 import           Text.Megaparsec (Parsec, (<?>))
 import qualified Text.Megaparsec as Parsec
@@ -55,6 +56,8 @@ keywords = Set.fromList
     , "let"
     , "in"
     , "def"
+    , "match"
+    , "with"
     ]
 
 keyword :: Text -> Parser ()
@@ -239,11 +242,44 @@ defExpr =
         <*  keyword "in"
         <*> expr
 
+pattern :: Parser Pattern
+pattern = do
+    pos <- Parsec.getSourcePos
+    Parsec.choice
+        [ Term.PBool  pos <$> (keyword "true"  *> pure True)
+        , Term.PBool  pos <$> (keyword "false" *> pure False)
+        , Term.PInt   pos <$> decimal
+        , Term.PVar   pos <$> identifier
+        , Term.PTuple pos <$> (Vector.fromList <$> tuple)
+        ]
+  where
+    tuple =
+        symbol "("
+        *> pattern `Parsec.sepBy` symbol ","
+        <* symbol ")"
+
+matchExpr :: Parser Term
+matchExpr =
+    Term.Match
+        <$> Parsec.getSourcePos
+        <*  keyword "match"
+        <*> expr
+        <*  keyword "with"
+        <*> Parsec.some arm
+  where
+    arm =
+        (,)
+            <$  symbol "|"
+            <*> pattern
+            <*  symbol "->"
+            <*> expr
+
 expr :: Parser Term
 expr =
     Parsec.choice
         [ letExpr
         , defExpr
+        , matchExpr
         , simpleExpr
         ]
 

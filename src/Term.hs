@@ -2,8 +2,8 @@
 module Term
     ( Term(..)
     , Operator(..)
+    , Pattern(..)
     , pretty
-    , sourcePos
     , mapSourcePos
     , sourcePosPretty
     , SourcePos
@@ -13,12 +13,15 @@ import           Identifier (Identifier)
 import qualified Identifier
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Functor ()
+import qualified Data.Vector as Vector
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 
 data Term
     = Bool     !SourcePos !Bool
     | Int      !SourcePos !Integer
     | If       !SourcePos Term Term Term
+    | Match    !SourcePos Term [(Pattern, Term)]
     | Variable !SourcePos !Identifier
     | Lambda   !SourcePos !Identifier Term
     | Apply    !SourcePos Term Term
@@ -39,20 +42,12 @@ data Operator
     | Equal -- '=='
     deriving (Show, Eq)
 
-sourcePos :: Term -> SourcePos
-sourcePos term =
-    case term of
-        Bool sp _ -> sp
-        Int sp _ -> sp
-        If sp _ _ _ -> sp
-        Variable sp _ -> sp
-        Lambda sp _ _ -> sp
-        Apply sp _ _ -> sp
-        BinOp sp _ _ _ -> sp
-        Let sp _ _ _ -> sp
-        Def sp _ _ _ _ -> sp
-        List sp _ -> sp
-        Tuple sp _ -> sp
+data Pattern
+    = PBool  !SourcePos !Bool
+    | PInt   !SourcePos !Integer
+    | PVar   !SourcePos !Identifier
+    | PTuple !SourcePos (Vector.Vector Pattern)
+    deriving (Show, Eq)
 
 mapSourcePos :: (SourcePos -> SourcePos) -> Term -> Term
 mapSourcePos f term =
@@ -60,6 +55,7 @@ mapSourcePos f term =
         Bool sp bool -> Bool (f sp) bool
         Int sp nat -> Int (f sp) nat
         If sp c t e -> If (f sp) (mapSourcePos f c) (mapSourcePos f t) (mapSourcePos f e)
+        Match sp expr arms -> Match (f sp) (mapSourcePos f expr) (map (\(p, t) -> (p, mapSourcePos f t)) arms)
         Variable sp i -> Variable (f sp) i
         Lambda sp a b -> Lambda (f sp) a (mapSourcePos f b)
         Apply sp fn a -> Apply (f sp) (mapSourcePos f fn) (mapSourcePos f a)
@@ -88,6 +84,17 @@ pretty indentLevel term =
             <> indent indentLevel
             <> pretty (indentLevel + 1) elseTerm
             <> ")"
+
+        Match _ expr arms ->
+            let
+                prettyArm (p, t) =
+                    "| " <> patternPretty p <> " -> " <> pretty (indentLevel + 1) t
+            in
+            "(MATCH "
+            <> pretty (indentLevel + 1) expr
+            <> "\n"
+            <> T.intercalate "\n" (map prettyArm arms)
+            <> "\n)"
 
         Variable _ identifier ->
             Identifier.name identifier
@@ -164,6 +171,9 @@ operatorPretty operator =
         And -> "&&"
         Or  -> "||"
         Equal -> "=="
+
+patternPretty :: Pattern -> Text
+patternPretty = undefined
 
 indent :: Int -> Text
 indent level =
