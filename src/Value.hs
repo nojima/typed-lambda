@@ -9,12 +9,12 @@ import qualified Data.Vector as Vector
 import qualified Data.Map.Strict as Map
 
 data Value
-    = Bool Bool
-    | Int Integer
-    | List [Value]
-    | Tuple (Vector.Vector Value)
-    | Closure Frame Identifier Term
-    | NativeFunction Identifier (Value -> Either RuntimeError Value)
+    = Bool    !Bool
+    | Int     !Integer
+    | List    [Value]
+    | Tuple   (Vector.Vector Value)
+    | Closure Frame !Identifier !Term
+    | NativeFunction !Identifier (Value -> Either RuntimeError Value)
 
 newtype RuntimeError = RuntimeError T.Text
 

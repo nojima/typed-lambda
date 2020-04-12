@@ -16,17 +16,17 @@ import qualified Data.Text as T
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 
 data Term
-    = Bool     SourcePos Bool
-    | Int      SourcePos Integer
-    | If       SourcePos Term Term Term
-    | Variable SourcePos Identifier
-    | Lambda   SourcePos Identifier Term
-    | Apply    SourcePos Term Term
-    | BinOp    SourcePos Operator Term Term
-    | Let      SourcePos Identifier Term Term
-    | Def      SourcePos Identifier Identifier Term Term
-    | List     SourcePos [Term]
-    | Tuple    SourcePos [Term]
+    = Bool     !SourcePos !Bool
+    | Int      !SourcePos !Integer
+    | If       !SourcePos Term Term Term
+    | Variable !SourcePos !Identifier
+    | Lambda   !SourcePos !Identifier Term
+    | Apply    !SourcePos Term Term
+    | BinOp    !SourcePos !Operator Term Term
+    | Let      !SourcePos !Identifier Term Term
+    | Def      !SourcePos !Identifier !Identifier Term Term
+    | List     !SourcePos [Term]
+    | Tuple    !SourcePos [Term]
     deriving (Show, Eq)
 
 data Operator
