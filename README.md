@@ -36,7 +36,6 @@ false
 引数は必ず一つだけです。
 
 ```
--- identity function
 lambda x. x
 ```
 
