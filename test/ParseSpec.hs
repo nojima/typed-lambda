@@ -43,17 +43,17 @@ spec =
 
         context "lambda expression" $ do
             it "can pares lambda expression" $
-                parse "lambda hoge : Bool . foo" `shouldSuccess`
+                parse "lambda hoge . foo" `shouldSuccess`
                     Term.Lambda x "hoge" (Term.Variable x "foo")
 
             it "can apply lambda" $
-                parse "(lambda hoge : Bool . hoge) 10" `shouldSuccess`
+                parse "(lambda hoge . hoge) 10" `shouldSuccess`
                     Term.Apply x
                         (Term.Lambda x "hoge" (Term.Variable x "hoge"))
                         (Term.Int x 10)
 
             it "can apply multiple argument" $
-                parse "(lambda hoge : Bool . lambda fuga : Int . fuga) true 10" `shouldSuccess`
+                parse "(lambda hoge . lambda fuga . fuga) true 10" `shouldSuccess`
                     Term.Apply x
                         (Term.Apply x
                             (Term.Lambda x "hoge"
