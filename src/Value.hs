@@ -1,8 +1,8 @@
 module Value (Value(..), Frame, RuntimeError(..)) where
 
-import Term (Term)
+import           Term (Term)
 import qualified Term
-import Identifier (Identifier)
+import           Identifier (Identifier)
 import qualified Identifier
 import qualified Data.Text as T
 import qualified Data.Vector as Vector

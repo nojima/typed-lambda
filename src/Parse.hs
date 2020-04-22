@@ -93,7 +93,7 @@ identifier =
             in
             Parsec.parseError err
         else
-            return $ Identifier.Identifier word
+            return $ Identifier.fromText word
 
 --------------------------------------------------------------------------------
 

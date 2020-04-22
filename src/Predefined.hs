@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Predefined (Function(..), functions) where
 
-import qualified Identifier
+import           Identifier (Identifier)
 import           Type (TypeScheme(..))
 import qualified Type
 import           Value (Value, RuntimeError(..))
@@ -10,7 +10,7 @@ import           Data.Vector ((!))
 
 data Function =
     Function
-        { name       :: Identifier.Identifier
+        { name       :: Identifier
         , typeScheme :: TypeScheme
         , function   :: Value -> Either RuntimeError Value
         }

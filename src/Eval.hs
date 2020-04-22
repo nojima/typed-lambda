@@ -25,7 +25,7 @@ evalVariable frame identifier =
                     <> Identifier.name identifier
                     <> "'"
             in
-            Left (RuntimeError errorMessage)
+            Left $ RuntimeError errorMessage
 
 evalIf :: Frame -> Term -> Term -> Term -> Either RuntimeError Value
 evalIf frame condTerm thenTerm elseTerm = do
