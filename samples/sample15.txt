@@ -1,0 +1,3 @@
+(lambda identity.
+    let n = identity 100 in n
+) (lambda x. x)

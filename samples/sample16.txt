@@ -1,0 +1,6 @@
+-- 型エラーが発生する
+(lambda identity.
+    let n = identity 100 in
+    let b = identity true in
+    if b then n else n+1
+) (lambda x. x)

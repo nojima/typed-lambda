@@ -95,7 +95,6 @@ let多相はその名の通りletで束縛したときに起こります。
 ```
 (lambda identity.
     let n = identity 100 in
-    let n = identity 100 in
     let b = identity true in
     if b then n else n+1
 ) (lambda x. x)

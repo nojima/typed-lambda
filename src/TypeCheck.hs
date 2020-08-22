@@ -114,6 +114,11 @@ applySubstitution sub =
             Nothing ->
                 Type.Var v
 
+applySubstitutionToEnv :: Substitution -> Env -> Env
+applySubstitutionToEnv sub =
+    fmap $ \(ForAll vars type_) ->
+        ForAll vars (applySubstitution sub type_)
+
 -------------------------------------------------------------------------------
 
 -- 型制約
@@ -305,11 +310,12 @@ constrainMatch matchPos env expr arms = do
                        , Map.unions envs
                        )
 
-calculatePrincipalType :: Env -> Type -> Constraints -> TypeChecker TypeScheme
+calculatePrincipalType :: Env -> Type -> Constraints -> TypeChecker (TypeScheme, Env)
 calculatePrincipalType env type_ constraints = do
     sub <- Except.liftEither $ unify constraints
+    let newEnv = applySubstitutionToEnv sub env
     let principalType = applySubstitution sub type_
-    return $ generalize env principalType
+    return (generalize newEnv principalType, newEnv)
 
 -- 型環境 env における term の型と型制約を求める。
 constrain :: Env -> Term -> TypeChecker (Type, Constraints)
@@ -378,12 +384,12 @@ constrain env term =
         Term.Let _ name expr body -> do
             -- expr の主要型を求める
             (exprType, exprConstraints) <- constrain env expr
-            exprPrincipalType <- calculatePrincipalType env exprType exprConstraints
+            (exprPrincipalType, exprEnv) <- calculatePrincipalType env exprType exprConstraints
 
             -- body の型と型制約を求める
-            let bodyEnv = Map.insert name exprPrincipalType env
+            let bodyEnv = Map.insert name exprPrincipalType exprEnv
             (bodyType, bodyConstraints) <- constrain bodyEnv body
-            return (bodyType, bodyConstraints)
+            return (bodyType, exprConstraints <> bodyConstraints)
 
         Term.Def pos name argName expr body -> do
             argVar <- newVariable
@@ -402,10 +408,10 @@ constrain env term =
             let retConstraint =
                     CEqual (Type.Var retVar) exprType
                         (Description pos "type mismatch in the returned value of the function")
-            funPrincipalType <- calculatePrincipalType env funType (retConstraint:exprConstraints)
+            (funPrincipalType, newEnv) <- calculatePrincipalType env funType (retConstraint:exprConstraints)
 
             -- body の型と型制約を求める
-            let bodyEnv = Map.insert name funPrincipalType env
+            let bodyEnv = Map.insert name funPrincipalType newEnv
             (bodyType, bodyConstraints) <- constrain bodyEnv body
             return (bodyType, bodyConstraints)
 
@@ -441,11 +447,11 @@ typeCheck term = do
                 map (\(Predefined.Function name typeScheme _) -> (name, typeScheme))
                 Predefined.functions
 
-    (type_, constraintss) <-
+    (type_, constraints) <-
         State.evalState
             (Except.runExceptT (constrain initialEnv term))
             TypingState { stateNextId = 0 }
 
-    sub <- unify constraintss
+    sub <- unify constraints
 
     return $ applySubstitution sub type_
