@@ -1,20 +1,20 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e931005a65f99c9eab02dfaf6ab88f59c7c2c755f680f101c8f89e146e9a9b26
+-- hash: add286e5a225977ae2102f4eae482131b2f534b74cfd20cf3dd02038c433da42
 
 name:           typed-lambda
-version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/typed-lambda#readme>
-homepage:       https://github.com/githubuser/typed-lambda#readme
-bug-reports:    https://github.com/githubuser/typed-lambda/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
-license:        BSD3
+version:        1.0.0.0
+description:    Please see the README on GitHub at <https://github.com/nojima/typed-lambda#readme>
+homepage:       https://github.com/nojima/typed-lambda#readme
+bug-reports:    https://github.com/nojima/typed-lambda/issues
+author:         Yusuke Nojima
+maintainer:     nojima@ynojima.com
+copyright:      2020 Yusuke Nojima
+license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/typed-lambda
+  location: https://github.com/nojima/typed-lambda
 
 library
   exposed-modules:
